@@ -457,3 +457,91 @@ class TestEtherscanClient:
             # But addresses should still be parsed correctly
             assert swap_event.caller == "0x888888888889758f76e7103c6cbf23abbf58f946"
             assert swap_event.receiver == "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e"
+
+    # Tests for get_block_number_by_timestamp method
+
+    def test_get_block_number_by_timestamp_success(self, client):
+        """Test successful block number retrieval by timestamp."""
+        mock_response = {"status": "1", "message": "OK", "result": "23403509"}
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            block_number = client.get_block_number_by_timestamp(1758361967, "after")
+            assert block_number == 23403509
+
+    def test_get_block_number_by_timestamp_before(self, client):
+        """Test block number retrieval with 'before' parameter."""
+        mock_response = {"status": "1", "message": "OK", "result": "23403508"}
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            block_number = client.get_block_number_by_timestamp(1758361967, "before")
+            assert block_number == 23403508
+
+    def test_get_block_number_by_timestamp_default_closest(self, client):
+        """Test block number retrieval with default 'before' parameter."""
+        mock_response = {"status": "1", "message": "OK", "result": "23403508"}
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            block_number = client.get_block_number_by_timestamp(1758361967)
+            assert block_number == 23403508
+
+    def test_get_block_number_by_timestamp_invalid_timestamp(self, client):
+        """Test get_block_number_by_timestamp with invalid timestamp."""
+        with pytest.raises(ValidationError) as exc_info:
+            client.get_block_number_by_timestamp(-1, "after")
+
+        assert "Timestamp must be positive" in str(exc_info.value)
+        assert exc_info.value.field == "timestamp"
+        assert exc_info.value.value == "-1"
+
+    def test_get_block_number_by_timestamp_zero_timestamp(self, client):
+        """Test get_block_number_by_timestamp with zero timestamp."""
+        with pytest.raises(ValidationError) as exc_info:
+            client.get_block_number_by_timestamp(0, "after")
+
+        assert "Timestamp must be positive" in str(exc_info.value)
+        assert exc_info.value.field == "timestamp"
+
+    def test_get_block_number_by_timestamp_invalid_closest(self, client):
+        """Test get_block_number_by_timestamp with invalid closest parameter."""
+        with pytest.raises(ValidationError) as exc_info:
+            client.get_block_number_by_timestamp(1758361967, "invalid")
+
+        assert "closest parameter must be 'before' or 'after'" in str(exc_info.value)
+        assert exc_info.value.field == "closest"
+        assert exc_info.value.value == "invalid"
+
+    def test_get_block_number_by_timestamp_api_error(self, client):
+        """Test API error handling for get_block_number_by_timestamp."""
+        mock_response = {
+            "status": "0",
+            "message": "NOTOK",
+            "result": "Error! Invalid timestamp",
+        }
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            with pytest.raises(APIError) as exc_info:
+                client.get_block_number_by_timestamp(1758361967, "after")
+
+            assert "Etherscan API error: NOTOK" in str(exc_info.value)
+
+    def test_get_block_number_by_timestamp_pydantic_validation_error(self, client):
+        """Test handling of Pydantic validation errors."""
+        # Test with invalid response that will fail Pydantic validation
+        mock_response = {"status": "1", "message": "OK", "result": 12345}
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            with pytest.raises(ValidationError) as exc_info:
+                client.get_block_number_by_timestamp(1758361967, "after")
+
+            # Should get a Pydantic validation error wrapped in our ValidationError
+            assert "Invalid response format" in str(exc_info.value)
+
+    def test_get_block_number_by_timestamp_invalid_block_number(self, client):
+        """Test handling of invalid block number in result."""
+        mock_response = {"status": "1", "message": "OK", "result": "not_a_number"}
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            with pytest.raises(ValidationError) as exc_info:
+                client.get_block_number_by_timestamp(1758361967, "after")
+
+            assert "Invalid block number format: not_a_number" in str(exc_info.value)

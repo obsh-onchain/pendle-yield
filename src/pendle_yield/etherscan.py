@@ -401,3 +401,71 @@ class EtherscanClient:
                     continue
 
         return swap_events
+
+    def get_block_number_by_timestamp(
+        self, timestamp: int, closest: str = "before"
+    ) -> int:
+        """
+        Get block number by timestamp using Etherscan API.
+
+        Args:
+            timestamp: Unix timestamp to find the block for
+            closest: Direction to search - "before" or "after" the timestamp
+
+        Returns:
+            Block number as integer
+
+        Raises:
+            ValidationError: If timestamp or closest parameter is invalid
+            APIError: If the API request fails
+        """
+        # Validate timestamp
+        if timestamp <= 0:
+            raise ValidationError(
+                "Timestamp must be positive",
+                field="timestamp",
+                value=str(timestamp),
+            )
+
+        # Validate closest parameter
+        if closest not in ("before", "after"):
+            raise ValidationError(
+                "closest parameter must be 'before' or 'after'",
+                field="closest",
+                value=closest,
+            )
+
+        # Etherscan API parameters for getting block by timestamp
+        params = {
+            "chainid": "1",  # Ethereum mainnet
+            "module": "block",
+            "action": "getblocknobytime",
+            "timestamp": str(timestamp),
+            "closest": closest,
+            "apikey": self.api_key,
+        }
+
+        url = self.base_url
+        response_data = self._make_request(url, params)
+
+        try:
+            etherscan_response = EtherscanResponse(**response_data)
+        except PydanticValidationError as e:
+            raise ValidationError(f"Invalid response format: {str(e)}") from e
+
+        if etherscan_response.status != "1":
+            raise APIError(f"Etherscan API error: {etherscan_response.message}")
+
+        # Parse the result as block number
+        if isinstance(etherscan_response.result, str):
+            try:
+                block_number = int(etherscan_response.result)
+                return block_number
+            except ValueError as e:
+                raise ValidationError(
+                    f"Invalid block number format: {etherscan_response.result}"
+                ) from e
+        else:
+            raise ValidationError(
+                f"Expected string result, got {type(etherscan_response.result)}"
+            )
