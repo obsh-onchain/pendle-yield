@@ -268,36 +268,21 @@ class EtherscanClient:
 
         return vote_events
 
-    def get_swap_events(
-        self, pool_address: str, from_block: int, to_block: int
-    ) -> list[SwapEvent]:
+    def get_swap_events(self, from_block: int, to_block: int) -> list[SwapEvent]:
         """
-        Fetch swap events for a specific pool address and block range from Etherscan.
+        Fetch swap events for all pools in a specific block range from Etherscan.
 
         Args:
-            pool_address: Pool contract address to fetch swaps for
             from_block: Starting block number
             to_block: Ending block number
 
         Returns:
-            List of swap events
+            List of swap events from all pools
 
         Raises:
-            ValidationError: If parameters are invalid
+            ValidationError: If block numbers are invalid
             APIError: If the API request fails
         """
-        # Validate pool address
-        if (
-            not pool_address
-            or not pool_address.startswith("0x")
-            or len(pool_address) != 42
-        ):
-            raise ValidationError(
-                "Invalid pool address format",
-                field="pool_address",
-                value=pool_address,
-            )
-
         # Validate block numbers
         if from_block <= 0 or to_block <= 0:
             raise ValidationError(
@@ -318,7 +303,6 @@ class EtherscanClient:
             "chainid": "1",  # Ethereum mainnet
             "module": "logs",
             "action": "getLogs",
-            "address": pool_address,  # Filter by pool address
             "fromBlock": str(from_block),
             "toBlock": str(to_block),
             "topic0": SWAP_TOPIC,  # Swap event signature
