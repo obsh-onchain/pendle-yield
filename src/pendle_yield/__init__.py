@@ -11,6 +11,7 @@ __author__ = "obsh-onchain"
 
 # Import main classes for easy access
 from .client import PendleYieldClient
+from .epoch import PendleEpoch
 from .etherscan import EtherscanClient
 from .exceptions import (
     APIError,
@@ -22,6 +23,7 @@ from .pendle import PendleClient
 
 __all__ = [
     "PendleYieldClient",
+    "PendleEpoch",
     "EtherscanClient",
     "PendleClient",
     "PendleYieldError",

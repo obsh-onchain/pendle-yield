@@ -181,7 +181,19 @@ class EtherscanClient:
             raise ValidationError(f"Invalid response format: {str(e)}") from e
 
         if etherscan_response.status != "1":
-            raise APIError(f"Etherscan API error: {etherscan_response.message}")
+            # Include more details about the error
+            error_details = {
+                "status": etherscan_response.status,
+                "message": etherscan_response.message,
+                "result": etherscan_response.result,
+                "params": params,
+            }
+            raise APIError(
+                f"Etherscan API error: {etherscan_response.message}",
+                status_code=None,
+                response_text=str(error_details),
+                url=url,
+            )
 
         # Parse log entries into vote events
         vote_events = []
@@ -322,7 +334,19 @@ class EtherscanClient:
             raise ValidationError(f"Invalid response format: {str(e)}") from e
 
         if etherscan_response.status != "1":
-            raise APIError(f"Etherscan API error: {etherscan_response.message}")
+            # Include more details about the error
+            error_details = {
+                "status": etherscan_response.status,
+                "message": etherscan_response.message,
+                "result": etherscan_response.result,
+                "params": params,
+            }
+            raise APIError(
+                f"Etherscan API error: {etherscan_response.message}",
+                status_code=None,
+                response_text=str(error_details),
+                url=url,
+            )
 
         # Parse log entries into swap events
         swap_events = []
@@ -454,7 +478,19 @@ class EtherscanClient:
             raise ValidationError(f"Invalid response format: {str(e)}") from e
 
         if etherscan_response.status != "1":
-            raise APIError(f"Etherscan API error: {etherscan_response.message}")
+            # Include more details about the error
+            error_details = {
+                "status": etherscan_response.status,
+                "message": etherscan_response.message,
+                "result": etherscan_response.result,
+                "params": params,
+            }
+            raise APIError(
+                f"Etherscan API error: {etherscan_response.message}",
+                status_code=None,
+                response_text=str(error_details),
+                url=url,
+            )
 
         # Parse the result as block number
         if isinstance(etherscan_response.result, str):

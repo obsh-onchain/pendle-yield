@@ -56,7 +56,7 @@ class TestPendleYieldClient:
         """Test client initialization with valid API key."""
         client = PendleYieldClient(etherscan_api_key="test_key")
         assert client.etherscan_api_key == "test_key"
-        assert client.etherscan_base_url == "https://api.etherscan.io/api"
+        assert client.etherscan_base_url == "https://api.etherscan.io/v2/api"
         assert client.pendle_base_url == "https://api-v2.pendle.finance/core"
 
     def test_init_empty_api_key(self):

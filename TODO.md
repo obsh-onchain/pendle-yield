@@ -1,0 +1,4 @@
+- [ ] add fetching of swaps by epoch to PendleYieldClient
+- [ ] handle current unfinished epoch gracefully
+- [ ] introduce logging
+- [ ] consider paginating Etherscan results with offset and limit

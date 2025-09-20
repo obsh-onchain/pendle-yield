@@ -7,6 +7,7 @@ interface for interacting with Pendle Finance data.
 
 from typing import Any
 
+from .epoch import PendleEpoch
 from .etherscan import EtherscanClient
 from .exceptions import APIError, ValidationError
 from .models import EnrichedVoteEvent, VoteEvent
@@ -24,7 +25,7 @@ class PendleYieldClient:
     def __init__(
         self,
         etherscan_api_key: str,
-        etherscan_base_url: str = "https://api.etherscan.io/api",
+        etherscan_base_url: str = "https://api.etherscan.io/v2/api",
         pendle_base_url: str = "https://api-v2.pendle.finance/core",
         timeout: float = 30.0,
         max_retries: int = 3,
@@ -138,3 +139,23 @@ class PendleYieldClient:
                 enriched_votes.append(enriched_vote)
 
         return enriched_votes
+
+    def get_votes_by_epoch(self, epoch: PendleEpoch) -> list[EnrichedVoteEvent]:
+        """
+        Get enriched vote events for a specific Pendle epoch.
+
+        Args:
+            epoch: PendleEpoch object representing the voting period
+
+        Returns:
+            List of enriched vote events for the epoch
+
+        Raises:
+            ValidationError: If epoch is invalid
+            APIError: If any API request fails
+        """
+        # Get block range from epoch
+        from_block, to_block = epoch.get_block_range(self._etherscan_client)
+
+        # Delegate to existing get_votes method
+        return self.get_votes(from_block, to_block)
