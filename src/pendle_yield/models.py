@@ -18,6 +18,7 @@ class VoteEvent(BaseModel):
     transaction_hash: str = Field(..., description="Transaction hash of the vote")
     voter_address: str = Field(..., description="Address of the voter")
     pool_address: str = Field(..., description="Address of the pool being voted for")
+    weight: int = Field(..., description="Vote weight value")
     bias: int = Field(..., description="Vote bias value")
     slope: int = Field(..., description="Vote slope value")
     timestamp: datetime | None = Field(None, description="Timestamp of the vote")
@@ -30,10 +31,10 @@ class VoteEvent(BaseModel):
             raise ValueError("Invalid Ethereum address format")
         return v.lower()
 
-    @field_validator("bias", "slope")
+    @field_validator("weight", "bias", "slope")
     @classmethod
     def validate_non_negative(cls, v: int) -> int:
-        """Validate that bias and slope are non-negative."""
+        """Validate that weight, bias and slope are non-negative."""
         if v < 0:
             raise ValueError("Value must be non-negative")
         return v
@@ -80,6 +81,7 @@ class EnrichedVoteEvent(BaseModel):
     transaction_hash: str = Field(..., description="Transaction hash of the vote")
     voter_address: str = Field(..., description="Address of the voter")
     pool_address: str = Field(..., description="Address of the pool being voted for")
+    weight: int = Field(..., description="Vote weight value")
     bias: int = Field(..., description="Vote bias value")
     slope: int = Field(..., description="Vote slope value")
     timestamp: datetime | None = Field(None, description="Timestamp of the vote")
@@ -154,6 +156,7 @@ class EnrichedVoteEvent(BaseModel):
             transaction_hash=vote_event.transaction_hash,
             voter_address=vote_event.voter_address,
             pool_address=vote_event.pool_address,
+            weight=vote_event.weight,
             bias=vote_event.bias,
             slope=vote_event.slope,
             timestamp=vote_event.timestamp,

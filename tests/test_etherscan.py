@@ -28,6 +28,7 @@ class TestEtherscanClient:
             transaction_hash="0xabc123",
             voter_address="0x1234567890123456789012345678901234567890",
             pool_address="0x0987654321098765432109876543210987654321",
+            weight=2000,
             bias=1000,
             slope=500,
         )
@@ -100,13 +101,22 @@ class TestEtherscanClient:
             assert "Internal Server Error" in exc_info.value.response_text
 
     def test_get_vote_events_invalid_block(self, client):
-        """Test get_vote_events with invalid block number."""
+        """Test get_vote_events with invalid block numbers."""
         with pytest.raises(ValidationError) as exc_info:
-            client.get_vote_events(-1)
+            client.get_vote_events(-1, 1000)
 
-        assert "Block number must be positive" in str(exc_info.value)
-        assert exc_info.value.field == "block_number"
-        assert exc_info.value.value == -1
+        assert "Block numbers must be positive" in str(exc_info.value)
+        assert exc_info.value.field == "block_numbers"
+
+    def test_get_vote_events_invalid_block_range(self, client):
+        """Test get_vote_events with invalid block range."""
+        with pytest.raises(ValidationError) as exc_info:
+            client.get_vote_events(2000, 1000)
+
+        assert "from_block must be less than or equal to to_block" in str(
+            exc_info.value
+        )
+        assert exc_info.value.field == "block_range"
 
     def test_get_vote_events_success(self, client):
         """Test successful vote events retrieval with real Etherscan API response format."""
@@ -153,7 +163,9 @@ class TestEtherscanClient:
         }
 
         with patch.object(client, "_make_request", return_value=mock_response):
-            vote_events = client.get_vote_events(23251350)  # Using real block number
+            vote_events = client.get_vote_events(
+                23251350, 23251350
+            )  # Using real block number
 
             assert len(vote_events) == 2
 
@@ -166,6 +178,10 @@ class TestEtherscanClient:
             )
             assert vote1.voter_address == "0x23ce39c9ab29d00fca9b83a50f64a67837c757c5"
             assert vote1.pool_address == "0x6d98a2b6cdbf44939362a3e99793339ba2016af4"
+            # The weight should be parsed from the first 64 hex chars of data
+            assert vote1.weight == int(
+                "0000000000000000000000000000000000000000000000000de0b6b3a7640000", 16
+            )
             # The bias and slope values should be parsed from the data field
             assert vote1.bias > 0  # Should have parsed some positive value
             assert vote1.slope > 0  # Should have parsed some positive value
@@ -182,6 +198,7 @@ class TestEtherscanClient:
             )
             assert vote2.voter_address == "0x23ce39c9ab29d00fca9b83a50f64a67837c757c5"
             assert vote2.pool_address == "0x61e4a41853550dc09dc296088ac83d770cd45c5a"
+            assert vote2.weight == 0  # Zero data should result in zero values
             assert vote2.bias == 0  # Zero data should result in zero values
             assert vote2.slope == 0
             # Both events should have the same timestamp
@@ -198,7 +215,7 @@ class TestEtherscanClient:
 
         with patch.object(client, "_make_request", return_value=mock_response):
             with pytest.raises(APIError) as exc_info:
-                client.get_vote_events(12345)
+                client.get_vote_events(12345, 12345)
 
             assert "Etherscan API error: NOTOK" in str(exc_info.value)
 
@@ -207,7 +224,7 @@ class TestEtherscanClient:
         mock_response = {"status": "1", "message": "OK", "result": []}
 
         with patch.object(client, "_make_request", return_value=mock_response):
-            vote_events = client.get_vote_events(12345)
+            vote_events = client.get_vote_events(12345, 12345)
             assert len(vote_events) == 0
 
     def test_get_vote_events_malformed_log(self, client):
@@ -235,7 +252,7 @@ class TestEtherscanClient:
         }
 
         with patch.object(client, "_make_request", return_value=mock_response):
-            vote_events = client.get_vote_events(12345)
+            vote_events = client.get_vote_events(12345, 12345)
             # Should skip malformed entries and return empty list
             assert len(vote_events) == 0
 

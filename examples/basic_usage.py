@@ -36,16 +36,17 @@ def main():
         print("🔧 Initializing PendleYieldClient...")
         client = PendleYieldClient(etherscan_api_key=api_key)
 
-        # Example block number - you can change this to test different blocks
+        # Example block range - you can change this to test different blocks
         # Using a block that contains vote events
-        block_number = 23251350
+        from_block = 23251350
+        to_block = 23251350
 
-        print(f"🔍 Fetching enriched vote events for block {block_number:,}...")
+        print(f"🔍 Fetching enriched vote events for block range {from_block:,} to {to_block:,}...")
         print("   This combines Etherscan vote data with Pendle pool information")
         print()
 
         # Get enriched vote events using the main method
-        votes = client.get_votes(block_number)
+        votes = client.get_votes(from_block, to_block)
 
         if votes:
             print(f"✅ Found {len(votes)} enriched vote events!")
@@ -58,6 +59,7 @@ def main():
                 print(f"   Pool: {vote.pool_name} ({vote.pool_symbol})")
                 print(f"   Protocol: {vote.protocol}")
                 print(f"   Chain ID: {vote.chain_id}")
+                print(f"   Vote Weight: {vote.weight:,}")
                 print(f"   Vote Bias: {vote.bias:,}")
                 print(f"   Vote Slope: {vote.slope:,}")
                 print(f"   VePendle Value: {vote.ve_pendle_value:.4f}")

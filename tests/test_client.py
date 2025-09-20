@@ -28,6 +28,7 @@ class TestPendleYieldClient:
             transaction_hash="0xabc123",
             voter_address="0x1234567890123456789012345678901234567890",
             pool_address="0x0987654321098765432109876543210987654321",
+            weight=2000,
             bias=1000,
             slope=500,
         )
@@ -90,6 +91,7 @@ class TestPendleYieldClient:
                 transaction_hash="0xabc123",
                 voter_address="0x1234567890123456789012345678901234567890",
                 pool_address="0x0987654321098765432109876543210987654321",
+                weight=2000,
                 bias=1000,
                 slope=500,
             )
@@ -98,9 +100,11 @@ class TestPendleYieldClient:
         with patch.object(
             client._etherscan_client, "get_vote_events", return_value=mock_vote_events
         ):
-            result = client.get_vote_events(12345)
+            result = client.get_vote_events(12345, 12345)
             assert result == mock_vote_events
-            client._etherscan_client.get_vote_events.assert_called_once_with(12345)
+            client._etherscan_client.get_vote_events.assert_called_once_with(
+                12345, 12345
+            )
 
     def test_get_votes_integration(self, client, mock_vote_event, mock_pool_info):
         """Test the integrated get_votes method using voter APR data."""
@@ -129,7 +133,7 @@ class TestPendleYieldClient:
                 "get_pool_voter_apr_data",
                 return_value=mock_voter_apr_response,
             ):
-                enriched_votes = client.get_votes(12345)
+                enriched_votes = client.get_votes(12345, 12345)
 
                 assert len(enriched_votes) == 1
                 vote = enriched_votes[0]
@@ -151,6 +155,7 @@ class TestValidationEdgeCases:
             transaction_hash="0xabc",
             voter_address="0x1234567890123456789012345678901234567890",
             pool_address="0x0987654321098765432109876543210987654321",
+            weight=200,
             bias=100,
             slope=50,
         )
@@ -163,6 +168,7 @@ class TestValidationEdgeCases:
                 transaction_hash="0xabc",
                 voter_address="invalid_address",
                 pool_address="0x0987654321098765432109876543210987654321",
+                weight=200,
                 bias=100,
                 slope=50,
             )
@@ -175,6 +181,7 @@ class TestValidationEdgeCases:
                 transaction_hash="0xabc",
                 voter_address="0x1234567890123456789012345678901234567890",
                 pool_address="0x0987654321098765432109876543210987654321",
+                weight=200,
                 bias=-100,  # Invalid negative bias
                 slope=50,
             )
@@ -186,6 +193,7 @@ class TestValidationEdgeCases:
             transaction_hash="0xabc",
             voter_address="0x1234567890123456789012345678901234567890",
             pool_address="0x0987654321098765432109876543210987654321",
+            weight=200,
             bias=100,
             slope=50,
         )

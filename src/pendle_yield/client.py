@@ -76,41 +76,43 @@ class PendleYieldClient:
         self._etherscan_client.close()
         self._pendle_client.close()
 
-    def get_vote_events(self, block_number: int) -> list[VoteEvent]:
+    def get_vote_events(self, from_block: int, to_block: int) -> list[VoteEvent]:
         """
-        Fetch vote events for a specific block number from Etherscan.
+        Fetch vote events for a specific block range from Etherscan.
 
         Args:
-            block_number: Block number to fetch votes for
+            from_block: Starting block number
+            to_block: Ending block number
 
         Returns:
             List of vote events
 
         Raises:
-            ValidationError: If block_number is invalid
+            ValidationError: If block numbers are invalid
             APIError: If the API request fails
         """
-        return self._etherscan_client.get_vote_events(block_number)
+        return self._etherscan_client.get_vote_events(from_block, to_block)
 
-    def get_votes(self, block_number: int) -> list[EnrichedVoteEvent]:
+    def get_votes(self, from_block: int, to_block: int) -> list[EnrichedVoteEvent]:
         """
-        Get enriched vote events for a specific block number.
+        Get enriched vote events for a specific block range.
 
         This method fetches vote events from Etherscan and enriches them with
         pool information from the Pendle voter APR API.
 
         Args:
-            block_number: Block number to fetch votes for
+            from_block: Starting block number
+            to_block: Ending block number
 
         Returns:
             List of enriched vote events
 
         Raises:
-            ValidationError: If block_number is invalid
+            ValidationError: If block numbers are invalid
             APIError: If any API request fails
         """
         # Fetch vote events from Etherscan
-        vote_events = self.get_vote_events(block_number)
+        vote_events = self.get_vote_events(from_block, to_block)
 
         # Fetch voter APR data from Pendle API (contains pool information)
         try:

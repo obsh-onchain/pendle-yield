@@ -131,25 +131,34 @@ class EtherscanClient:
             raise last_exception
         raise APIError("All retry attempts failed", url=url)
 
-    def get_vote_events(self, block_number: int) -> list[VoteEvent]:
+    def get_vote_events(self, from_block: int, to_block: int) -> list[VoteEvent]:
         """
-        Fetch vote events for a specific block number from Etherscan.
+        Fetch vote events for a specific block range from Etherscan.
 
         Args:
-            block_number: Block number to fetch votes for
+            from_block: Starting block number
+            to_block: Ending block number
 
         Returns:
             List of vote events
 
         Raises:
-            ValidationError: If block_number is invalid
+            ValidationError: If block numbers are invalid
             APIError: If the API request fails
         """
-        if block_number <= 0:
+        # Validate block numbers
+        if from_block <= 0 or to_block <= 0:
             raise ValidationError(
-                "Block number must be positive",
-                field="block_number",
-                value=block_number,
+                "Block numbers must be positive",
+                field="block_numbers",
+                value=f"from_block={from_block}, to_block={to_block}",
+            )
+
+        if from_block > to_block:
+            raise ValidationError(
+                "from_block must be less than or equal to to_block",
+                field="block_range",
+                value=f"from_block={from_block}, to_block={to_block}",
             )
 
         # Etherscan API parameters for getting logs
@@ -157,8 +166,8 @@ class EtherscanClient:
             "chainid": "1",  # Ethereum mainnet``
             "module": "logs",
             "action": "getLogs",
-            "fromBlock": str(block_number),
-            "toBlock": str(block_number),
+            "fromBlock": str(from_block),
+            "toBlock": str(to_block),
             "topic0": VOTE_TOPIC,  # Vote event signature
             "apikey": self.api_key,
         }
@@ -202,10 +211,14 @@ class EtherscanClient:
 
                     # Each parameter is 32 bytes (64 hex chars)
                     if len(data_hex) >= 192:  # 3 * 64 chars for weight, bias, slope
+                        weight_hex = data_hex[0:64]
                         bias_hex = data_hex[64:128]
                         slope_hex = data_hex[128:192]
 
-                        # Convert hex to integers (handle signed integers for bias and slope)
+                        # Convert hex to integers
+                        weight = int(
+                            weight_hex, 16
+                        )  # weight is uint256, always positive
                         bias = int(bias_hex, 16)
                         slope = int(slope_hex, 16)
 
@@ -218,6 +231,7 @@ class EtherscanClient:
                             bias = bias - 2**256
                     else:
                         # Handle case where data might be shorter (like in the second log entry)
+                        weight = 0
                         bias = 0
                         slope = 0
 
@@ -230,6 +244,7 @@ class EtherscanClient:
                         transaction_hash=log_entry.transaction_hash,
                         voter_address=voter_address,
                         pool_address=pool_address,
+                        weight=weight,  # weight is always positive (uint256)
                         bias=abs(bias),  # Store as positive value
                         slope=abs(slope),  # Store as positive value
                         timestamp=timestamp,
