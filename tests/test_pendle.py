@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from pendle_yield.exceptions import APIError, RateLimitError, ValidationError
-from pendle_yield.models import VoterAprResponse, PoolVoterData, PoolInfo
+from pendle_yield.models import PoolInfo, PoolVoterData, VoterAprResponse
 from pendle_yield.pendle import PendleClient
 
 

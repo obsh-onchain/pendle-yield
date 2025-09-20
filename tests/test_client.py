@@ -9,7 +9,7 @@ import pytest
 
 from pendle_yield.client import PendleYieldClient
 from pendle_yield.exceptions import ValidationError
-from pendle_yield.models import EnrichedVoteEvent, VoteEvent, PoolInfo
+from pendle_yield.models import EnrichedVoteEvent, PoolInfo, VoteEvent
 
 
 class TestPendleYieldClient:
@@ -104,7 +104,7 @@ class TestPendleYieldClient:
 
     def test_get_votes_integration(self, client, mock_vote_event, mock_pool_info):
         """Test the integrated get_votes method using voter APR data."""
-        from pendle_yield.models import VoterAprResponse, PoolVoterData
+        from pendle_yield.models import PoolVoterData, VoterAprResponse
 
         # Create mock voter APR response
         mock_voter_apr_response = VoterAprResponse(

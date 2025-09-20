@@ -36,7 +36,7 @@ class TestEtherscanClient:
         """Test client initialization with valid API key."""
         client = EtherscanClient(api_key="test_key")
         assert client.api_key == "test_key"
-        assert client.base_url == "https://api.etherscan.io/api"
+        assert client.base_url == "https://api.etherscan.io/v2/api"
 
     def test_init_empty_api_key(self):
         """Test client initialization with empty API key raises ValidationError."""
@@ -238,3 +238,205 @@ class TestEtherscanClient:
             vote_events = client.get_vote_events(12345)
             # Should skip malformed entries and return empty list
             assert len(vote_events) == 0
+
+    # Tests for get_swap_events method
+
+    def test_get_swap_events_invalid_pool_address(self, client):
+        """Test get_swap_events with invalid pool address."""
+        with pytest.raises(ValidationError) as exc_info:
+            client.get_swap_events("invalid_address", 1000, 2000)
+
+        assert "Invalid pool address format" in str(exc_info.value)
+        assert exc_info.value.field == "pool_address"
+
+    def test_get_swap_events_negative_blocks(self, client):
+        """Test get_swap_events with negative block numbers."""
+        pool_address = "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e"
+
+        with pytest.raises(ValidationError) as exc_info:
+            client.get_swap_events(pool_address, -1, 1000)
+
+        assert "Block numbers must be positive" in str(exc_info.value)
+        assert exc_info.value.field == "block_numbers"
+
+    def test_get_swap_events_invalid_block_range(self, client):
+        """Test get_swap_events with invalid block range."""
+        pool_address = "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e"
+
+        with pytest.raises(ValidationError) as exc_info:
+            client.get_swap_events(pool_address, 2000, 1000)
+
+        assert "from_block must be less than or equal to to_block" in str(
+            exc_info.value
+        )
+        assert exc_info.value.field == "block_range"
+
+    def test_get_swap_events_success(self, client):
+        """Test successful swap events retrieval with provided API response data."""
+        # Using the provided API response data
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    "topics": [
+                        "0x829000a5bc6a12d46e30cdcecd7c56b1efd88f6d7d059da6734a04f3764557c4",
+                        "0x000000000000000000000000888888888889758f76e7103c6cbf23abbf58f946",
+                        "0x000000000000000000000000f342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000003f40b86776a39724665fffffffffffffffffffffffffffffffffffffffffffffc2579eb7e7520d31f9f0000000000000000000000000000000000000000000000005bdbb3b4910deb5d000000000000000000000000000000000000000000000000497c8fc3a73e55e4",
+                    "blockNumber": "0x1651bf5",
+                    "blockHash": "0x286a4b662389390eef4704b04cf45e9c81e5b30157e9eb55f5097f6a9976e676",
+                    "timeStamp": "0x68ce796f",
+                    "gasPrice": "0x11b7b899",
+                    "gasUsed": "0x74418",
+                    "logIndex": "0x6a",
+                    "transactionHash": "0x89b0acd3f493951473feb23034a290ce54e362c5f1859a467d749d6e5e5b237b",
+                    "transactionIndex": "0x1a",
+                }
+            ],
+        }
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            swap_events = client.get_swap_events(
+                "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                23403509,  # 0x1651bf5 in decimal
+                23403509,
+            )
+
+            assert len(swap_events) == 1
+
+            swap_event = swap_events[0]
+            assert swap_event.block_number == 23403509  # 0x1651bf5 in decimal
+            assert (
+                swap_event.transaction_hash
+                == "0x89b0acd3f493951473feb23034a290ce54e362c5f1859a467d749d6e5e5b237b"
+            )
+            assert (
+                swap_event.pool_address == "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e"
+            )
+            assert swap_event.caller == "0x888888888889758f76e7103c6cbf23abbf58f946"
+            assert swap_event.receiver == "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e"
+
+            # Test parsed data values
+            # netPtOut: 0x0000000000000000000000000000000000000000000003f40b86776a39724665 = 18,668,935,485,073,476,699,749 (positive)
+            assert swap_event.net_pt_out == 18668935485073476699749
+
+            # netSyOut: 0xfffffffffffffffffffffffffffffffffffffffffffffc2579eb7e7520d31f9f (negative int256)
+            # This is a negative number in two's complement
+            expected_net_sy_out = (
+                -18198151146211684180065
+            )  # Calculated from the hex value
+            assert swap_event.net_sy_out == expected_net_sy_out
+
+            # netSyFee: 0x0000000000000000000000000000000000000000000000005bdbb3b4910deb5d = 6,619,081,665,460,169,565
+            assert swap_event.net_sy_fee == 6619081665460169565
+
+            # netSyToReserve: 0x000000000000000000000000000000000000000000000000497c8fc3a73e55e4 = 5,295,265,332,368,135,652
+            assert swap_event.net_sy_to_reserve == 5295265332368135652
+
+            # Check timestamp is properly converted (0x68ce796f = 1758361967 in decimal)
+            assert swap_event.timestamp is not None
+            assert swap_event.timestamp.timestamp() == 1758361967
+
+    def test_get_swap_events_api_error(self, client):
+        """Test API error handling for swap events."""
+        mock_response = {
+            "status": "0",
+            "message": "NOTOK",
+            "result": "Error! Invalid address format",
+        }
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            with pytest.raises(APIError) as exc_info:
+                client.get_swap_events(
+                    "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e", 1000, 2000
+                )
+
+            assert "Etherscan API error: NOTOK" in str(exc_info.value)
+
+    def test_get_swap_events_empty_result(self, client):
+        """Test handling of empty swap events results."""
+        mock_response = {"status": "1", "message": "OK", "result": []}
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            swap_events = client.get_swap_events(
+                "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e", 1000, 2000
+            )
+            assert len(swap_events) == 0
+
+    def test_get_swap_events_malformed_log(self, client):
+        """Test handling of malformed swap event log entries."""
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    "topics": [
+                        "0x829000a5bc6a12d46e30cdcecd7c56b1efd88f6d7d059da6734a04f3764557c4"
+                    ],  # Missing required topics
+                    "data": "0x0000000000000000000000000000000000000000000003f40b86776a39724665",
+                    "blockNumber": "0x1651bf5",
+                    "transactionHash": "0x89b0acd3f493951473feb23034a290ce54e362c5f1859a467d749d6e5e5b237b",
+                    "transactionIndex": "0x1a",
+                    "blockHash": "0x286a4b662389390eef4704b04cf45e9c81e5b30157e9eb55f5097f6a9976e676",
+                    "logIndex": "0x6a",
+                    "timeStamp": "0x68ce796f",
+                    "gasPrice": "0x11b7b899",
+                    "gasUsed": "0x74418",
+                }
+            ],
+        }
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            swap_events = client.get_swap_events(
+                "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e", 1000, 2000
+            )
+            # Should skip malformed entries and return empty list
+            assert len(swap_events) == 0
+
+    def test_get_swap_events_short_data(self, client):
+        """Test handling of swap events with insufficient data."""
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    "topics": [
+                        "0x829000a5bc6a12d46e30cdcecd7c56b1efd88f6d7d059da6734a04f3764557c4",
+                        "0x000000000000000000000000888888888889758f76e7103c6cbf23abbf58f946",
+                        "0x000000000000000000000000f342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000003f40b86776a39724665",  # Too short
+                    "blockNumber": "0x1651bf5",
+                    "blockHash": "0x286a4b662389390eef4704b04cf45e9c81e5b30157e9eb55f5097f6a9976e676",
+                    "timeStamp": "0x68ce796f",
+                    "gasPrice": "0x11b7b899",
+                    "gasUsed": "0x74418",
+                    "logIndex": "0x6a",
+                    "transactionHash": "0x89b0acd3f493951473feb23034a290ce54e362c5f1859a467d749d6e5e5b237b",
+                    "transactionIndex": "0x1a",
+                }
+            ],
+        }
+
+        with patch.object(client, "_make_request", return_value=mock_response):
+            swap_events = client.get_swap_events(
+                "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e", 1000, 2000
+            )
+
+            assert len(swap_events) == 1
+            swap_event = swap_events[0]
+
+            # Should have zero values for all data fields when data is too short
+            assert swap_event.net_pt_out == 0
+            assert swap_event.net_sy_out == 0
+            assert swap_event.net_sy_fee == 0
+            assert swap_event.net_sy_to_reserve == 0
+
+            # But addresses should still be parsed correctly
+            assert swap_event.caller == "0x888888888889758f76e7103c6cbf23abbf58f946"
+            assert swap_event.receiver == "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e"

@@ -6,7 +6,6 @@ to fetch pool metadata and other DeFi-related data.
 """
 
 import time
-from datetime import datetime
 from typing import Any
 
 import httpx
