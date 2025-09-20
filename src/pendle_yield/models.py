@@ -8,7 +8,7 @@ used throughout the package.
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class VoteEvent(BaseModel):
@@ -188,8 +188,7 @@ class EtherscanLogEntry(BaseModel):
     gas_used: str = Field(alias="gasUsed")
     removed: bool = Field(default=False)
 
-    class Config:
-        validate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class EtherscanResponse(BaseModel):
