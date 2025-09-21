@@ -21,6 +21,10 @@ VOTE_TOPIC = "0xc71e393f1527f71ce01b78ea87c9bd4fca84f1482359ce7ac9b73f358c61b1e1
 # Topic for the 'Swap' event: Swap(address indexed caller, address indexed receiver, int256 netPtOut, int256 netSyOut, uint256 netSyFee, uint256 netSyToReserve)
 SWAP_TOPIC = "0x829000a5bc6a12d46e30cdcecd7c56b1efd88f6d7d059da6734a04f3764557c4"
 
+# Block batch size for handling Etherscan API limitation (page × offset ≤ 10,000)
+# This splits large block ranges into smaller chunks to avoid hitting the limit
+BLOCK_BATCH_SIZE = 1000
+
 
 class EtherscanClient:
     """
@@ -36,6 +40,7 @@ class EtherscanClient:
         base_url: str = "https://api.etherscan.io/v2/api",
         timeout: float = 30.0,
         max_retries: int = 3,
+        requests_per_second: float = 5.0,
     ) -> None:
         """
         Initialize the EtherscanClient.
@@ -45,6 +50,7 @@ class EtherscanClient:
             base_url: Base URL for Etherscan API
             timeout: Request timeout in seconds
             max_retries: Maximum number of retries for failed requests
+            requests_per_second: Maximum requests per second (default: 5 for free tier)
         """
         if not api_key:
             raise ValidationError("Etherscan API key is required", field="api_key")
@@ -53,6 +59,11 @@ class EtherscanClient:
         self.base_url = base_url
         self.timeout = timeout
         self.max_retries = max_retries
+
+        # Rate limiting configuration
+        self._requests_per_second = requests_per_second
+        self._min_request_interval = 1.0 / requests_per_second
+        self._last_request_time = 0.0
 
         # HTTP client configuration
         self._client = httpx.Client(
@@ -72,130 +83,34 @@ class EtherscanClient:
         """Close the HTTP client."""
         self._client.close()
 
-    def _make_request(
-        self, url: str, params: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    def _enforce_rate_limit(self) -> None:
         """
-        Make an HTTP request with retry logic.
+        Enforce rate limiting by sleeping if necessary.
+
+        Ensures that requests are spaced at least _min_request_interval apart.
+        """
+        current_time = time.time()
+        time_since_last_request = current_time - self._last_request_time
+
+        if time_since_last_request < self._min_request_interval:
+            sleep_time = self._min_request_interval - time_since_last_request
+            time.sleep(sleep_time)
+            self._last_request_time = current_time + sleep_time
+        else:
+            self._last_request_time = current_time
+
+    def _parse_vote_events(
+        self, etherscan_response: EtherscanResponse
+    ) -> list[VoteEvent]:
+        """
+        Parse log entries into vote events.
 
         Args:
-            url: URL to request
-            params: Query parameters
+            etherscan_response: Validated Etherscan API response
 
         Returns:
-            JSON response data
-
-        Raises:
-            APIError: If the request fails
-            RateLimitError: If rate limit is exceeded
+            List of parsed vote events
         """
-        last_exception = None
-
-        for attempt in range(self.max_retries + 1):
-            try:
-                response = self._client.get(url, params=params)
-
-                if response.status_code == 429:
-                    retry_after = int(response.headers.get("Retry-After", 60))
-                    raise RateLimitError(
-                        "Rate limit exceeded",
-                        retry_after=retry_after,
-                        status_code=response.status_code,
-                        url=url,
-                    )
-
-                response.raise_for_status()
-                json_response: dict[str, Any] = response.json()
-                return json_response
-
-            except httpx.HTTPStatusError as e:
-                last_exception = APIError(
-                    f"HTTP {e.response.status_code}: {e.response.text}",
-                    status_code=e.response.status_code,
-                    response_text=e.response.text,
-                    url=url,
-                )
-            except httpx.RequestError as e:
-                last_exception = APIError(f"Request failed: {str(e)}", url=url)
-            except RateLimitError:
-                # Re-raise RateLimitError as-is
-                raise
-            except Exception as e:
-                last_exception = APIError(f"Unexpected error: {str(e)}", url=url)
-
-            if attempt < self.max_retries:
-                time.sleep(2**attempt)  # Exponential backoff
-
-        # This should never be reached due to the loop logic, but mypy needs this
-        if last_exception is not None:
-            raise last_exception
-        raise APIError("All retry attempts failed", url=url)
-
-    def get_vote_events(self, from_block: int, to_block: int) -> list[VoteEvent]:
-        """
-        Fetch vote events for a specific block range from Etherscan.
-
-        Args:
-            from_block: Starting block number
-            to_block: Ending block number
-
-        Returns:
-            List of vote events
-
-        Raises:
-            ValidationError: If block numbers are invalid
-            APIError: If the API request fails
-        """
-        # Validate block numbers
-        if from_block <= 0 or to_block <= 0:
-            raise ValidationError(
-                "Block numbers must be positive",
-                field="block_numbers",
-                value=f"from_block={from_block}, to_block={to_block}",
-            )
-
-        if from_block > to_block:
-            raise ValidationError(
-                "from_block must be less than or equal to to_block",
-                field="block_range",
-                value=f"from_block={from_block}, to_block={to_block}",
-            )
-
-        # Etherscan API parameters for getting logs
-        params = {
-            "chainid": "1",  # Ethereum mainnet``
-            "module": "logs",
-            "action": "getLogs",
-            "fromBlock": str(from_block),
-            "toBlock": str(to_block),
-            "topic0": VOTE_TOPIC,  # Vote event signature
-            "apikey": self.api_key,
-        }
-
-        url = self.base_url
-        response_data = self._make_request(url, params)
-
-        try:
-            etherscan_response = EtherscanResponse(**response_data)
-        except PydanticValidationError as e:
-            raise ValidationError(f"Invalid response format: {str(e)}") from e
-
-        if etherscan_response.status != "1":
-            # Include more details about the error
-            error_details = {
-                "status": etherscan_response.status,
-                "message": etherscan_response.message,
-                "result": etherscan_response.result,
-                "params": params,
-            }
-            raise APIError(
-                f"Etherscan API error: {etherscan_response.message}",
-                status_code=None,
-                response_text=str(error_details),
-                url=url,
-            )
-
-        # Parse log entries into vote events
         vote_events = []
         if isinstance(etherscan_response.result, list):
             for log_entry in etherscan_response.result:
@@ -268,71 +183,18 @@ class EtherscanClient:
 
         return vote_events
 
-    def get_swap_events(self, from_block: int, to_block: int) -> list[SwapEvent]:
+    def _parse_swap_events(
+        self, etherscan_response: EtherscanResponse
+    ) -> list[SwapEvent]:
         """
-        Fetch swap events for all pools in a specific block range from Etherscan.
+        Parse log entries into swap events.
 
         Args:
-            from_block: Starting block number
-            to_block: Ending block number
+            etherscan_response: Validated Etherscan API response
 
         Returns:
-            List of swap events from all pools
-
-        Raises:
-            ValidationError: If block numbers are invalid
-            APIError: If the API request fails
+            List of parsed swap events
         """
-        # Validate block numbers
-        if from_block <= 0 or to_block <= 0:
-            raise ValidationError(
-                "Block numbers must be positive",
-                field="block_numbers",
-                value=f"from_block={from_block}, to_block={to_block}",
-            )
-
-        if from_block > to_block:
-            raise ValidationError(
-                "from_block must be less than or equal to to_block",
-                field="block_range",
-                value=f"from_block={from_block}, to_block={to_block}",
-            )
-
-        # Etherscan API parameters for getting logs
-        params = {
-            "chainid": "1",  # Ethereum mainnet
-            "module": "logs",
-            "action": "getLogs",
-            "fromBlock": str(from_block),
-            "toBlock": str(to_block),
-            "topic0": SWAP_TOPIC,  # Swap event signature
-            "apikey": self.api_key,
-        }
-
-        url = self.base_url
-        response_data = self._make_request(url, params)
-
-        try:
-            etherscan_response = EtherscanResponse(**response_data)
-        except PydanticValidationError as e:
-            raise ValidationError(f"Invalid response format: {str(e)}") from e
-
-        if etherscan_response.status != "1":
-            # Include more details about the error
-            error_details = {
-                "status": etherscan_response.status,
-                "message": etherscan_response.message,
-                "result": etherscan_response.result,
-                "params": params,
-            }
-            raise APIError(
-                f"Etherscan API error: {etherscan_response.message}",
-                status_code=None,
-                response_text=str(error_details),
-                url=url,
-            )
-
-        # Parse log entries into swap events
         swap_events = []
         if isinstance(etherscan_response.result, list):
             for log_entry in etherscan_response.result:
@@ -409,6 +271,336 @@ class EtherscanClient:
                     continue
 
         return swap_events
+
+    def _make_request(
+        self, url: str, params: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """
+        Make an HTTP request with retry logic.
+
+        Args:
+            url: URL to request
+            params: Query parameters
+
+        Returns:
+            JSON response data
+
+        Raises:
+            APIError: If the request fails
+            RateLimitError: If rate limit is exceeded
+        """
+        last_exception = None
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                print(url, params)
+                response = self._client.get(url, params=params)
+
+                if response.status_code == 429:
+                    retry_after = int(response.headers.get("Retry-After", 60))
+                    raise RateLimitError(
+                        "Rate limit exceeded",
+                        retry_after=retry_after,
+                        status_code=response.status_code,
+                        url=url,
+                    )
+
+                response.raise_for_status()
+                json_response: dict[str, Any] = response.json()
+                return json_response
+
+            except httpx.HTTPStatusError as e:
+                last_exception = APIError(
+                    f"HTTP {e.response.status_code}: {e.response.text}",
+                    status_code=e.response.status_code,
+                    response_text=e.response.text,
+                    url=url,
+                )
+            except httpx.RequestError as e:
+                last_exception = APIError(f"Request failed: {str(e)}", url=url)
+            except RateLimitError:
+                # Re-raise RateLimitError as-is
+                raise
+            except Exception as e:
+                last_exception = APIError(f"Unexpected error: {str(e)}", url=url)
+
+            if attempt < self.max_retries:
+                time.sleep(2**attempt)  # Exponential backoff
+
+        # This should never be reached due to the loop logic, but mypy needs this
+        if last_exception is not None:
+            raise last_exception
+        raise APIError("All retry attempts failed", url=url)
+
+    def get_vote_events(
+        self, from_block: int, to_block: int, max_pages: int | None = None
+    ) -> list[VoteEvent]:
+        """
+        Fetch vote events for a specific block range from Etherscan with pagination.
+
+        Uses block range batching to handle Etherscan API limitation where page × offset ≤ 10,000.
+        Large block ranges are split into smaller chunks to avoid hitting this limit.
+
+        Args:
+            from_block: Starting block number
+            to_block: Ending block number
+            max_pages: Maximum number of pages to fetch per block batch (None for unlimited)
+
+        Returns:
+            List of vote events
+
+        Raises:
+            ValidationError: If block numbers are invalid
+            APIError: If the API request fails
+        """
+        # Validate block numbers
+        if from_block <= 0 or to_block <= 0:
+            raise ValidationError(
+                "Block numbers must be positive",
+                field="block_numbers",
+                value=f"from_block={from_block}, to_block={to_block}",
+            )
+
+        if from_block > to_block:
+            raise ValidationError(
+                "from_block must be less than or equal to to_block",
+                field="block_range",
+                value=f"from_block={from_block}, to_block={to_block}",
+            )
+
+        all_vote_events = []
+
+        # Split the block range into batches to avoid Etherscan API limitation
+        current_from = from_block
+        while current_from <= to_block:
+            current_to = min(current_from + BLOCK_BATCH_SIZE - 1, to_block)
+
+            # Fetch events for current block batch with pagination
+            batch_events = self._get_vote_events_for_batch(
+                current_from, current_to, max_pages
+            )
+            all_vote_events.extend(batch_events)
+
+            current_from = current_to + 1
+
+        return all_vote_events
+
+    def _get_vote_events_for_batch(
+        self, from_block: int, to_block: int, max_pages: int | None = None
+    ) -> list[VoteEvent]:
+        """
+        Fetch vote events for a single block batch with pagination.
+
+        Args:
+            from_block: Starting block number for this batch
+            to_block: Ending block number for this batch
+            max_pages: Maximum number of pages to fetch (None for unlimited)
+
+        Returns:
+            List of vote events for this batch
+
+        Raises:
+            APIError: If the API request fails
+        """
+        batch_events = []
+        page = 1
+
+        while True:
+            # Enforce rate limiting before each request
+            self._enforce_rate_limit()
+
+            # Etherscan API parameters for getting logs with pagination
+            params = {
+                "chainid": "1",  # Ethereum mainnet
+                "module": "logs",
+                "action": "getLogs",
+                "fromBlock": str(from_block),
+                "toBlock": str(to_block),
+                "topic0": VOTE_TOPIC,  # Vote event signature
+                "page": str(page),
+                "offset": "1000",  # Maximum results per page
+                "apikey": self.api_key,
+            }
+
+            url = self.base_url
+            response_data = self._make_request(url, params)
+
+            try:
+                etherscan_response = EtherscanResponse(**response_data)
+            except PydanticValidationError as e:
+                raise ValidationError(f"Invalid response format: {str(e)}") from e
+
+            if etherscan_response.status != "1":
+                # Include more details about the error
+                error_details = {
+                    "status": etherscan_response.status,
+                    "message": etherscan_response.message,
+                    "result": etherscan_response.result,
+                    "params": params,
+                }
+                raise APIError(
+                    f"Etherscan API error: {etherscan_response.message}",
+                    status_code=None,
+                    response_text=str(error_details),
+                    url=url,
+                )
+
+            # Parse log entries into vote events
+            page_events = self._parse_vote_events(etherscan_response)
+            batch_events.extend(page_events)
+
+            # Check if we should continue pagination
+            if len(page_events) < 1000:
+                # Less than 1000 results means this is the last page
+                break
+
+            if max_pages is not None and page >= max_pages:
+                # Reached maximum page limit
+                break
+
+            # Check if we're approaching the API limit (page × offset ≤ 10,000)
+            if page >= 10:  # With offset=1000, page 10 gives us 10,000 results
+                # Stop pagination to avoid hitting the limit
+                break
+
+            page += 1
+
+        return batch_events
+
+    def get_swap_events(
+        self, from_block: int, to_block: int, max_pages: int | None = None
+    ) -> list[SwapEvent]:
+        """
+        Fetch swap events for all pools in a specific block range from Etherscan with pagination.
+
+        Uses block range batching to handle Etherscan API limitation where page × offset ≤ 10,000.
+        Large block ranges are split into smaller chunks to avoid hitting this limit.
+
+        Args:
+            from_block: Starting block number
+            to_block: Ending block number
+            max_pages: Maximum number of pages to fetch per block batch (None for unlimited)
+
+        Returns:
+            List of swap events from all pools
+
+        Raises:
+            ValidationError: If block numbers are invalid
+            APIError: If the API request fails
+        """
+        # Validate block numbers
+        if from_block <= 0 or to_block <= 0:
+            raise ValidationError(
+                "Block numbers must be positive",
+                field="block_numbers",
+                value=f"from_block={from_block}, to_block={to_block}",
+            )
+
+        if from_block > to_block:
+            raise ValidationError(
+                "from_block must be less than or equal to to_block",
+                field="block_range",
+                value=f"from_block={from_block}, to_block={to_block}",
+            )
+
+        all_swap_events = []
+
+        # Split the block range into batches to avoid Etherscan API limitation
+        current_from = from_block
+        while current_from <= to_block:
+            current_to = min(current_from + BLOCK_BATCH_SIZE - 1, to_block)
+
+            # Fetch events for current block batch with pagination
+            batch_events = self._get_swap_events_for_batch(
+                current_from, current_to, max_pages
+            )
+            all_swap_events.extend(batch_events)
+
+            current_from = current_to + 1
+
+        return all_swap_events
+
+    def _get_swap_events_for_batch(
+        self, from_block: int, to_block: int, max_pages: int | None = None
+    ) -> list[SwapEvent]:
+        """
+        Fetch swap events for a single block batch with pagination.
+
+        Args:
+            from_block: Starting block number for this batch
+            to_block: Ending block number for this batch
+            max_pages: Maximum number of pages to fetch (None for unlimited)
+
+        Returns:
+            List of swap events for this batch
+
+        Raises:
+            APIError: If the API request fails
+        """
+        batch_events = []
+        page = 1
+
+        while True:
+            # Enforce rate limiting before each request
+            self._enforce_rate_limit()
+
+            # Etherscan API parameters for getting logs with pagination
+            params = {
+                "chainid": "1",  # Ethereum mainnet
+                "module": "logs",
+                "action": "getLogs",
+                "fromBlock": str(from_block),
+                "toBlock": str(to_block),
+                "topic0": SWAP_TOPIC,  # Swap event signature
+                "page": str(page),
+                "offset": "1000",  # Maximum results per page
+                "apikey": self.api_key,
+            }
+
+            url = self.base_url
+            response_data = self._make_request(url, params)
+
+            try:
+                etherscan_response = EtherscanResponse(**response_data)
+            except PydanticValidationError as e:
+                raise ValidationError(f"Invalid response format: {str(e)}") from e
+
+            if etherscan_response.status != "1":
+                # Include more details about the error
+                error_details = {
+                    "status": etherscan_response.status,
+                    "message": etherscan_response.message,
+                    "result": etherscan_response.result,
+                    "params": params,
+                }
+                raise APIError(
+                    f"Etherscan API error: {etherscan_response.message}",
+                    status_code=None,
+                    response_text=str(error_details),
+                    url=url,
+                )
+
+            # Parse log entries into swap events
+            page_events = self._parse_swap_events(etherscan_response)
+            batch_events.extend(page_events)
+
+            # Check if we should continue pagination
+            if len(page_events) < 1000:
+                # Less than 1000 results means this is the last page
+                break
+
+            if max_pages is not None and page >= max_pages:
+                # Reached maximum page limit
+                break
+
+            # Check if we're approaching the API limit (page × offset ≤ 10,000)
+            if page >= 10:  # With offset=1000, page 10 gives us 10,000 results
+                # Stop pagination to avoid hitting the limit
+                break
+
+            page += 1
+
+        return batch_events
 
     def get_block_number_by_timestamp(
         self, timestamp: int, closest: str = "before"

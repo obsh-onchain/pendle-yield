@@ -458,7 +458,8 @@ class TestEtherscanClient:
         }
 
         with patch.object(client, "_make_request", return_value=mock_response):
-            swap_events = client.get_swap_events(1000, 2000)
+            # Use a range within a single batch to get exactly one event
+            swap_events = client.get_swap_events(1000, 1500)
 
             assert len(swap_events) == 1
             swap_event = swap_events[0]
@@ -560,3 +561,486 @@ class TestEtherscanClient:
                 client.get_block_number_by_timestamp(1758361967, "after")
 
             assert "Invalid block number format: not_a_number" in str(exc_info.value)
+
+    # Tests for pagination functionality
+
+    def test_get_vote_events_pagination_single_page(self, client):
+        """Test pagination with single page (less than 1000 results)."""
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0x44087e105137a5095c008aab6a6530182821f2f0",
+                    "topics": [
+                        "0xc71e393f1527f71ce01b78ea87c9bd4fca84f1482359ce7ac9b73f358c61b1e1",
+                        "0x00000000000000000000000023ce39c9ab29d00fca9b83a50f64a67837c757c5",
+                        "0x0000000000000000000000006d98a2b6cdbf44939362a3e99793339ba2016af4",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000079206cec12fc1322fd7000000000000000000000000000000000000000000000000000011e0ee61f4b64a",
+                    "blockNumber": "0x162c996",
+                    "blockHash": "0x2bcf153ff39a252324c3049a528d4571793d68bb64b50d10e193005e8d58a7d7",
+                    "timeStamp": "0x68b273eb",
+                    "gasPrice": "0x43efee42",
+                    "gasUsed": "0x19514",
+                    "logIndex": "0x90",
+                    "transactionHash": "0x4010dca56ab072d9c8b56f877025ba155ad1b9c0cfe609b571e3567f8d879043",
+                    "transactionIndex": "0x26",
+                }
+            ],
+        }
+
+        with patch.object(
+            client, "_make_request", return_value=mock_response
+        ) as mock_request:
+            vote_events = client.get_vote_events(12345, 12345)
+
+            # Should only make one request since we got less than 1000 results
+            assert mock_request.call_count == 1
+            assert len(vote_events) == 1
+
+            # Check that pagination parameters were included
+            # The parameters are passed as the second positional argument to _make_request
+            call_args = mock_request.call_args
+            assert call_args is not None
+            # _make_request is called with (url, params)
+            params = call_args[0][1]  # Second positional argument
+            assert "page" in params
+            assert "offset" in params
+            assert params["page"] == "1"
+            assert params["offset"] == "1000"
+
+    def test_get_vote_events_pagination_multiple_pages(self, client):
+        """Test pagination with multiple pages."""
+        # Mock responses for multiple pages
+        page1_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0x44087e105137a5095c008aab6a6530182821f2f0",
+                    "topics": [
+                        "0xc71e393f1527f71ce01b78ea87c9bd4fca84f1482359ce7ac9b73f358c61b1e1",
+                        "0x00000000000000000000000023ce39c9ab29d00fca9b83a50f64a67837c757c5",
+                        "0x0000000000000000000000006d98a2b6cdbf44939362a3e99793339ba2016af4",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000079206cec12fc1322fd7000000000000000000000000000000000000000000000000000011e0ee61f4b64a",
+                    "blockNumber": "0x162c996",
+                    "blockHash": "0x2bcf153ff39a252324c3049a528d4571793d68bb64b50d10e193005e8d58a7d7",
+                    "timeStamp": "0x68b273eb",
+                    "gasPrice": "0x43efee42",
+                    "gasUsed": "0x19514",
+                    "logIndex": "0x90",
+                    "transactionHash": "0x4010dca56ab072d9c8b56f877025ba155ad1b9c0cfe609b571e3567f8d879043",
+                    "transactionIndex": "0x26",
+                }
+            ]
+            * 1000,  # Exactly 1000 results to trigger next page
+        }
+
+        page2_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0x44087e105137a5095c008aab6a6530182821f2f0",
+                    "topics": [
+                        "0xc71e393f1527f71ce01b78ea87c9bd4fca84f1482359ce7ac9b73f358c61b1e1",
+                        "0x00000000000000000000000023ce39c9ab29d00fca9b83a50f64a67837c757c5",
+                        "0x0000000000000000000000006d98a2b6cdbf44939362a3e99793339ba2016af4",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000079206cec12fc1322fd7000000000000000000000000000000000000000000000000000011e0ee61f4b64a",
+                    "blockNumber": "0x162c996",
+                    "blockHash": "0x2bcf153ff39a252324c3049a528d4571793d68bb64b50d10e193005e8d58a7d7",
+                    "timeStamp": "0x68b273eb",
+                    "gasPrice": "0x43efee42",
+                    "gasUsed": "0x19514",
+                    "logIndex": "0x90",
+                    "transactionHash": "0x4010dca56ab072d9c8b56f877025ba155ad1b9c0cfe609b571e3567f8d879043",
+                    "transactionIndex": "0x26",
+                }
+            ]
+            * 500,  # 500 results (less than 1000) to end pagination
+        }
+
+        with patch.object(
+            client, "_make_request", side_effect=[page1_response, page2_response]
+        ) as mock_request:
+            vote_events = client.get_vote_events(12345, 12345)
+
+            # Should make two requests
+            assert mock_request.call_count == 2
+            assert len(vote_events) == 1500  # 1000 + 500
+
+            # Check pagination parameters for both calls
+            first_call_params = mock_request.call_args_list[0][0][
+                1
+            ]  # Second positional arg of first call
+            assert first_call_params["page"] == "1"
+            assert first_call_params["offset"] == "1000"
+
+            second_call_params = mock_request.call_args_list[1][0][
+                1
+            ]  # Second positional arg of second call
+            assert second_call_params["page"] == "2"
+            assert second_call_params["offset"] == "1000"
+
+    def test_get_vote_events_pagination_max_pages(self, client):
+        """Test pagination with max_pages limit."""
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0x44087e105137a5095c008aab6a6530182821f2f0",
+                    "topics": [
+                        "0xc71e393f1527f71ce01b78ea87c9bd4fca84f1482359ce7ac9b73f358c61b1e1",
+                        "0x00000000000000000000000023ce39c9ab29d00fca9b83a50f64a67837c757c5",
+                        "0x0000000000000000000000006d98a2b6cdbf44939362a3e99793339ba2016af4",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000079206cec12fc1322fd7000000000000000000000000000000000000000000000000000011e0ee61f4b64a",
+                    "blockNumber": "0x162c996",
+                    "blockHash": "0x2bcf153ff39a252324c3049a528d4571793d68bb64b50d10e193005e8d58a7d7",
+                    "timeStamp": "0x68b273eb",
+                    "gasPrice": "0x43efee42",
+                    "gasUsed": "0x19514",
+                    "logIndex": "0x90",
+                    "transactionHash": "0x4010dca56ab072d9c8b56f877025ba155ad1b9c0cfe609b571e3567f8d879043",
+                    "transactionIndex": "0x26",
+                }
+            ]
+            * 1000,  # Always return 1000 results to test max_pages limit
+        }
+
+        with patch.object(
+            client, "_make_request", return_value=mock_response
+        ) as mock_request:
+            vote_events = client.get_vote_events(12345, 12345, max_pages=2)
+
+            # Should stop after 2 pages due to max_pages limit
+            assert mock_request.call_count == 2
+            assert len(vote_events) == 2000  # 2 pages * 1000 results each
+
+    def test_get_swap_events_pagination_single_page(self, client):
+        """Test swap events pagination with single page."""
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    "topics": [
+                        "0x829000a5bc6a12d46e30cdcecd7c56b1efd88f6d7d059da6734a04f3764557c4",
+                        "0x000000000000000000000000888888888889758f76e7103c6cbf23abbf58f946",
+                        "0x000000000000000000000000f342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000003f40b86776a39724665fffffffffffffffffffffffffffffffffffffffffffffc2579eb7e7520d31f9f0000000000000000000000000000000000000000000000005bdbb3b4910deb5d000000000000000000000000000000000000000000000000497c8fc3a73e55e4",
+                    "blockNumber": "0x1651bf5",
+                    "blockHash": "0x286a4b662389390eef4704b04cf45e9c81e5b30157e9eb55f5097f6a9976e676",
+                    "timeStamp": "0x68ce796f",
+                    "gasPrice": "0x11b7b899",
+                    "gasUsed": "0x74418",
+                    "logIndex": "0x6a",
+                    "transactionHash": "0x89b0acd3f493951473feb23034a290ce54e362c5f1859a467d749d6e5e5b237b",
+                    "transactionIndex": "0x1a",
+                }
+            ],
+        }
+
+        with patch.object(
+            client, "_make_request", return_value=mock_response
+        ) as mock_request:
+            swap_events = client.get_swap_events(12345, 12345)
+
+            # Should only make one request since we got less than 1000 results
+            assert mock_request.call_count == 1
+            assert len(swap_events) == 1
+
+            # Check that pagination parameters were included
+            call_args = mock_request.call_args
+            params = call_args[0][1]  # Second positional argument
+            assert params["page"] == "1"
+            assert params["offset"] == "1000"
+
+    def test_rate_limiting_initialization(self):
+        """Test rate limiting configuration during initialization."""
+        # Test default rate limiting (5 req/sec)
+        client = EtherscanClient(api_key="test_key")
+        assert client._requests_per_second == 5.0
+        assert client._min_request_interval == 0.2  # 1/5 = 0.2 seconds
+
+        # Test custom rate limiting
+        client_custom = EtherscanClient(api_key="test_key", requests_per_second=10.0)
+        assert client_custom._requests_per_second == 10.0
+        assert client_custom._min_request_interval == 0.1  # 1/10 = 0.1 seconds
+
+    def test_rate_limiting_enforcement(self, client):
+        """Test that rate limiting is enforced."""
+
+        # Mock time.time() and time.sleep to control timing
+        with (
+            patch("pendle_yield.etherscan.time.time") as mock_time,
+            patch("pendle_yield.etherscan.time.sleep") as mock_sleep,
+        ):
+            # Reset the client's last request time to simulate a fresh start
+            client._last_request_time = 0.0
+
+            # Set up time progression: first call at 1.0, second call at 1.1 (only 0.1s later)
+            mock_time.side_effect = [
+                1.0,
+                1.1,
+                1.1,
+                1.3,
+            ]  # First call, check, sleep, final time
+
+            # First call should not sleep (enough time has passed since last request)
+            client._enforce_rate_limit()
+            assert mock_sleep.call_count == 0
+
+            # Second call should sleep because only 0.1 seconds have passed (need 0.2)
+            client._enforce_rate_limit()
+            # The sleep time should be 0.2 - 0.1 = 0.1 seconds
+            # Use pytest.approx to handle floating-point precision issues
+            mock_sleep.assert_called_once()
+            actual_sleep_time = mock_sleep.call_args[0][0]
+            assert actual_sleep_time == pytest.approx(0.1, abs=1e-10)
+
+    # Tests for block range batching functionality
+
+    def test_get_vote_events_block_batching_single_batch(self, client):
+        """Test block range batching with a range that fits in a single batch."""
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0x44087e105137a5095c008aab6a6530182821f2f0",
+                    "topics": [
+                        "0xc71e393f1527f71ce01b78ea87c9bd4fca84f1482359ce7ac9b73f358c61b1e1",
+                        "0x00000000000000000000000023ce39c9ab29d00fca9b83a50f64a67837c757c5",
+                        "0x0000000000000000000000006d98a2b6cdbf44939362a3e99793339ba2016af4",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000079206cec12fc1322fd7000000000000000000000000000000000000000000000000000011e0ee61f4b64a",
+                    "blockNumber": "0x162c996",
+                    "blockHash": "0x2bcf153ff39a252324c3049a528d4571793d68bb64b50d10e193005e8d58a7d7",
+                    "timeStamp": "0x68b273eb",
+                    "gasPrice": "0x43efee42",
+                    "gasUsed": "0x19514",
+                    "logIndex": "0x90",
+                    "transactionHash": "0x4010dca56ab072d9c8b56f877025ba155ad1b9c0cfe609b571e3567f8d879043",
+                    "transactionIndex": "0x26",
+                }
+            ],
+        }
+
+        with patch.object(
+            client, "_make_request", return_value=mock_response
+        ) as mock_request:
+            # Test with a range smaller than BLOCK_BATCH_SIZE (1000)
+            vote_events = client.get_vote_events(1000, 1500)
+
+            # Should only make one request since range is within single batch
+            assert mock_request.call_count == 1
+            assert len(vote_events) == 1
+
+            # Check that the request was made with correct block range
+            call_args = mock_request.call_args
+            params = call_args[0][1]
+            assert params["fromBlock"] == "1000"
+            assert params["toBlock"] == "1500"
+
+    def test_get_vote_events_block_batching_multiple_batches(self, client):
+        """Test block range batching with a range that requires multiple batches."""
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0x44087e105137a5095c008aab6a6530182821f2f0",
+                    "topics": [
+                        "0xc71e393f1527f71ce01b78ea87c9bd4fca84f1482359ce7ac9b73f358c61b1e1",
+                        "0x00000000000000000000000023ce39c9ab29d00fca9b83a50f64a67837c757c5",
+                        "0x0000000000000000000000006d98a2b6cdbf44939362a3e99793339ba2016af4",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000079206cec12fc1322fd7000000000000000000000000000000000000000000000000000011e0ee61f4b64a",
+                    "blockNumber": "0x162c996",
+                    "blockHash": "0x2bcf153ff39a252324c3049a528d4571793d68bb64b50d10e193005e8d58a7d7",
+                    "timeStamp": "0x68b273eb",
+                    "gasPrice": "0x43efee42",
+                    "gasUsed": "0x19514",
+                    "logIndex": "0x90",
+                    "transactionHash": "0x4010dca56ab072d9c8b56f877025ba155ad1b9c0cfe609b571e3567f8d879043",
+                    "transactionIndex": "0x26",
+                }
+            ],
+        }
+
+        with patch.object(
+            client, "_make_request", return_value=mock_response
+        ) as mock_request:
+            # Test with a range that spans multiple batches (2500 blocks = 3 batches)
+            vote_events = client.get_vote_events(1000, 3500)
+
+            # Should make 3 requests for 3 batches
+            assert mock_request.call_count == 3
+            assert len(vote_events) == 3  # One event per batch
+
+            # Check that requests were made with correct block ranges
+            call_args_list = mock_request.call_args_list
+
+            # First batch: 1000-1999
+            first_params = call_args_list[0][0][1]
+            assert first_params["fromBlock"] == "1000"
+            assert first_params["toBlock"] == "1999"
+
+            # Second batch: 2000-2999
+            second_params = call_args_list[1][0][1]
+            assert second_params["fromBlock"] == "2000"
+            assert second_params["toBlock"] == "2999"
+
+            # Third batch: 3000-3500
+            third_params = call_args_list[2][0][1]
+            assert third_params["fromBlock"] == "3000"
+            assert third_params["toBlock"] == "3500"
+
+    def test_get_swap_events_block_batching_single_batch(self, client):
+        """Test swap events block range batching with a single batch."""
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    "topics": [
+                        "0x829000a5bc6a12d46e30cdcecd7c56b1efd88f6d7d059da6734a04f3764557c4",
+                        "0x000000000000000000000000888888888889758f76e7103c6cbf23abbf58f946",
+                        "0x000000000000000000000000f342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000003f40b86776a39724665fffffffffffffffffffffffffffffffffffffffffffffc2579eb7e7520d31f9f0000000000000000000000000000000000000000000000005bdbb3b4910deb5d000000000000000000000000000000000000000000000000497c8fc3a73e55e4",
+                    "blockNumber": "0x1651bf5",
+                    "blockHash": "0x286a4b662389390eef4704b04cf45e9c81e5b30157e9eb55f5097f6a9976e676",
+                    "timeStamp": "0x68ce796f",
+                    "gasPrice": "0x11b7b899",
+                    "gasUsed": "0x74418",
+                    "logIndex": "0x6a",
+                    "transactionHash": "0x89b0acd3f493951473feb23034a290ce54e362c5f1859a467d749d6e5e5b237b",
+                    "transactionIndex": "0x1a",
+                }
+            ],
+        }
+
+        with patch.object(
+            client, "_make_request", return_value=mock_response
+        ) as mock_request:
+            # Test with a range smaller than BLOCK_BATCH_SIZE
+            swap_events = client.get_swap_events(1000, 1500)
+
+            # Should only make one request
+            assert mock_request.call_count == 1
+            assert len(swap_events) == 1
+
+            # Check that the request was made with correct block range
+            call_args = mock_request.call_args
+            params = call_args[0][1]
+            assert params["fromBlock"] == "1000"
+            assert params["toBlock"] == "1500"
+
+    def test_get_swap_events_block_batching_multiple_batches(self, client):
+        """Test swap events block range batching with multiple batches."""
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0xf342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    "topics": [
+                        "0x829000a5bc6a12d46e30cdcecd7c56b1efd88f6d7d059da6734a04f3764557c4",
+                        "0x000000000000000000000000888888888889758f76e7103c6cbf23abbf58f946",
+                        "0x000000000000000000000000f342d4bde4ec5b4bba94c17ab4c92ee3792abd5e",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000003f40b86776a39724665fffffffffffffffffffffffffffffffffffffffffffffc2579eb7e7520d31f9f0000000000000000000000000000000000000000000000005bdbb3b4910deb5d000000000000000000000000000000000000000000000000497c8fc3a73e55e4",
+                    "blockNumber": "0x1651bf5",
+                    "blockHash": "0x286a4b662389390eef4704b04cf45e9c81e5b30157e9eb55f5097f6a9976e676",
+                    "timeStamp": "0x68ce796f",
+                    "gasPrice": "0x11b7b899",
+                    "gasUsed": "0x74418",
+                    "logIndex": "0x6a",
+                    "transactionHash": "0x89b0acd3f493951473feb23034a290ce54e362c5f1859a467d749d6e5e5b237b",
+                    "transactionIndex": "0x1a",
+                }
+            ],
+        }
+
+        with patch.object(
+            client, "_make_request", return_value=mock_response
+        ) as mock_request:
+            # Test with a range that spans 2 batches
+            swap_events = client.get_swap_events(1000, 2200)
+
+            # Should make 2 requests for 2 batches
+            assert mock_request.call_count == 2
+            assert len(swap_events) == 2  # One event per batch
+
+            # Check that requests were made with correct block ranges
+            call_args_list = mock_request.call_args_list
+
+            # First batch: 1000-1999
+            first_params = call_args_list[0][0][1]
+            assert first_params["fromBlock"] == "1000"
+            assert first_params["toBlock"] == "1999"
+
+            # Second batch: 2000-2200
+            second_params = call_args_list[1][0][1]
+            assert second_params["fromBlock"] == "2000"
+            assert second_params["toBlock"] == "2200"
+
+    def test_batch_pagination_limit_enforcement(self, client):
+        """Test that pagination stops at page 10 to avoid API limit."""
+        # Mock response that always returns 1000 results to trigger pagination
+        mock_response = {
+            "status": "1",
+            "message": "OK",
+            "result": [
+                {
+                    "address": "0x44087e105137a5095c008aab6a6530182821f2f0",
+                    "topics": [
+                        "0xc71e393f1527f71ce01b78ea87c9bd4fca84f1482359ce7ac9b73f358c61b1e1",
+                        "0x00000000000000000000000023ce39c9ab29d00fca9b83a50f64a67837c757c5",
+                        "0x0000000000000000000000006d98a2b6cdbf44939362a3e99793339ba2016af4",
+                    ],
+                    "data": "0x0000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000079206cec12fc1322fd7000000000000000000000000000000000000000000000000000011e0ee61f4b64a",
+                    "blockNumber": "0x162c996",
+                    "blockHash": "0x2bcf153ff39a252324c3049a528d4571793d68bb64b50d10e193005e8d58a7d7",
+                    "timeStamp": "0x68b273eb",
+                    "gasPrice": "0x43efee42",
+                    "gasUsed": "0x19514",
+                    "logIndex": "0x90",
+                    "transactionHash": "0x4010dca56ab072d9c8b56f877025ba155ad1b9c0cfe609b571e3567f8d879043",
+                    "transactionIndex": "0x26",
+                }
+            ]
+            * 1000,  # Always return 1000 results
+        }
+
+        with patch.object(
+            client, "_make_request", return_value=mock_response
+        ) as mock_request:
+            # Test with a small range that should trigger pagination limit
+            vote_events = client.get_vote_events(1000, 1100)
+
+            # Should stop at page 10 (10,000 results max)
+            assert mock_request.call_count == 10
+            assert len(vote_events) == 10000  # 10 pages * 1000 results each
+
+            # Check that pagination went from page 1 to page 10
+            call_args_list = mock_request.call_args_list
+            for i, call_args in enumerate(call_args_list):
+                params = call_args[0][1]
+                assert params["page"] == str(i + 1)  # Pages 1-10
+
+    def test_block_batch_size_constant(self):
+        """Test that BLOCK_BATCH_SIZE constant is properly defined."""
+        from pendle_yield.etherscan import BLOCK_BATCH_SIZE
+
+        assert BLOCK_BATCH_SIZE == 1000
+        assert isinstance(BLOCK_BATCH_SIZE, int)
