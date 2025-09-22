@@ -143,6 +143,33 @@ class TestPendleYieldClient:
                 assert vote.protocol == "Test Protocol"
                 assert vote.voter_apy == 0.055
 
+    def test_get_swap_events_delegation(self, client):
+        """Test that get_swap_events delegates to EtherscanClient."""
+        from pendle_yield.models import SwapEvent
+
+        mock_swap_events = [
+            SwapEvent(
+                block_number=12345,
+                transaction_hash="0xdef456",
+                pool_address="0x0987654321098765432109876543210987654321",
+                caller="0x1234567890123456789012345678901234567890",
+                receiver="0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+                net_pt_out=1000000,
+                net_sy_out=-500000,
+                net_sy_fee=5000,
+                net_sy_to_reserve=2000,
+            )
+        ]
+
+        with patch.object(
+            client._etherscan_client, "get_swap_events", return_value=mock_swap_events
+        ):
+            result = client.get_swap_events(12345, 12345)
+            assert result == mock_swap_events
+            client._etherscan_client.get_swap_events.assert_called_once_with(
+                12345, 12345
+            )
+
 
 class TestValidationEdgeCases:
     """Test edge cases for validation."""
