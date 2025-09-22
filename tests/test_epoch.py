@@ -184,7 +184,9 @@ class TestPendleEpoch:
         current_epoch = PendleEpoch()
 
         # At least one of these should be true, and they should be mutually exclusive
-        status_count = sum([current_epoch.is_past, current_epoch.is_current, current_epoch.is_future])
+        status_count = sum(
+            [current_epoch.is_past, current_epoch.is_current, current_epoch.is_future]
+        )
         assert status_count == 1, "Exactly one status should be true"
 
         # If we're in the current epoch, verify the logic
@@ -303,7 +305,9 @@ class TestPendleEpoch:
         for test_time in test_times:
             epoch = PendleEpoch(test_time)
             status_count = sum([epoch.is_past, epoch.is_current, epoch.is_future])
-            assert status_count == 1, f"Exactly one status should be true for {test_time}"
+            assert status_count == 1, (
+                f"Exactly one status should be true for {test_time}"
+            )
 
     def test_get_block_range_return_type_annotation(self):
         """Test that get_block_range returns the correct types."""

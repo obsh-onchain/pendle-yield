@@ -226,8 +226,8 @@ class PendleEpoch:
             if use_latest_for_current:
                 # Get the latest block number
                 end_block = etherscan_client.get_block_number_by_timestamp(
-                int(datetime.now().timestamp()), closest="before"
-            )
+                    int(datetime.now().timestamp()), closest="before"
+                )
             else:
                 # Return None to indicate the epoch is still ongoing
                 end_block = None

@@ -3,3 +3,4 @@
 - [ ] introduce logging
 - [x] consider paginating Etherscan results with offset and limit
 - [ ] consider caching of the Etherscan API results
+- [ ] store bias and slope, calculate VePendle value at the epoch end

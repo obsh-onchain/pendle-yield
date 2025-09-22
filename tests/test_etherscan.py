@@ -803,7 +803,7 @@ class TestEtherscanClient:
             # Use pytest.approx to handle floating-point precision issues
             mock_sleep.assert_called_once()
             actual_sleep_time = mock_sleep.call_args[0][0]
-            assert actual_sleep_time == pytest.approx(0.1, abs=1e-10)
+            assert actual_sleep_time == pytest.approx(0.2, abs=1e-10)
 
     # Tests for block range batching functionality
 

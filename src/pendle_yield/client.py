@@ -155,7 +155,18 @@ class PendleYieldClient:
             APIError: If any API request fails
         """
         # Get block range from epoch
-        from_block, to_block = epoch.get_block_range(self._etherscan_client, use_latest_for_current=True)
+        from_block, to_block = epoch.get_block_range(
+            self._etherscan_client, use_latest_for_current=True
+        )
+
+        # Handle case where to_block might be None for current epochs
+        if to_block is None:
+            raise ValidationError(
+                "Cannot get votes for current epoch without end block. "
+                "Use use_latest_for_current=True in get_block_range.",
+                field="to_block",
+                value=None,
+            )
 
         # Delegate to existing get_votes method
         return self.get_votes(from_block, to_block)

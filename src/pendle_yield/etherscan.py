@@ -93,9 +93,8 @@ class EtherscanClient:
         time_since_last_request = current_time - self._last_request_time
 
         if time_since_last_request < self._min_request_interval:
-            sleep_time = self._min_request_interval - time_since_last_request
-            time.sleep(sleep_time)
-            self._last_request_time = current_time + sleep_time
+            time.sleep(self._min_request_interval)
+            self._last_request_time = current_time + self._min_request_interval
         else:
             self._last_request_time = current_time
 
