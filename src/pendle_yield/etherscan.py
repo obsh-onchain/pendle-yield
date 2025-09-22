@@ -293,7 +293,6 @@ class EtherscanClient:
 
         for attempt in range(self.max_retries + 1):
             try:
-                print(url, params)
                 response = self._client.get(url, params=params)
 
                 if response.status_code == 429:

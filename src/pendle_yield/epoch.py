@@ -150,6 +150,22 @@ class PendleEpoch:
         """End of the epoch as Unix timestamp."""
         return int(self._end_datetime.timestamp())
 
+    @property
+    def is_past(self) -> bool:
+        """Check if this epoch has completely ended."""
+        return datetime.now(UTC) >= self._end_datetime
+
+    @property
+    def is_current(self) -> bool:
+        """Check if we are currently in this epoch."""
+        now = datetime.now(UTC)
+        return self._start_datetime <= now < self._end_datetime
+
+    @property
+    def is_future(self) -> bool:
+        """Check if this epoch hasn't started yet."""
+        return datetime.now(UTC) < self._start_datetime
+
     def contains(self, time_input: datetime | int | str) -> bool:
         """
         Check if a given time falls within this epoch.
@@ -167,25 +183,58 @@ class PendleEpoch:
         check_time = self._convert_to_utc_datetime(time_input)
         return self._start_datetime <= check_time < self._end_datetime
 
-    def get_block_range(self, etherscan_client: "EtherscanClient") -> tuple[int, int]:
+    def get_block_range(
+        self, etherscan_client: "EtherscanClient", use_latest_for_current: bool = False
+    ) -> tuple[int, int | None]:
         """
         Get the block number range for this epoch using Etherscan.
 
         Args:
             etherscan_client: EtherscanClient instance to use for block lookups
+            use_latest_for_current: If True, use the latest block number for current epochs.
+                                  If False, return None for the end block of current epochs.
 
         Returns:
-            Tuple of (start_block, end_block)
+            Tuple of (start_block, end_block). For current epochs, end_block may be None
+            or the latest block number depending on use_latest_for_current parameter.
 
         Raises:
+            ValidationError: If this is a future epoch (hasn't started yet)
             APIError: If the Etherscan API requests fail
         """
+        # Check if this is a future epoch
+        if self.is_future:
+            raise ValidationError(
+                f"Cannot get block range for future epoch. Epoch starts at {self.start_datetime.isoformat()}",
+                field="epoch_status",
+                value="future",
+            )
+
+        # Get start block (always available for current and past epochs)
         start_block = etherscan_client.get_block_number_by_timestamp(
             self.start_timestamp, closest="after"
         )
-        end_block = etherscan_client.get_block_number_by_timestamp(
-            self.end_timestamp, closest="before"
-        )
+
+        # Handle end block based on epoch status
+        if self.is_past:
+            # For past epochs, get the actual end block
+            end_block = etherscan_client.get_block_number_by_timestamp(
+                self.end_timestamp, closest="before"
+            )
+        elif self.is_current:
+            # For current epochs, handle based on user preference
+            if use_latest_for_current:
+                # Get the latest block number
+                end_block = etherscan_client.get_block_number_by_timestamp(
+                int(datetime.now().timestamp()), closest="before"
+            )
+            else:
+                # Return None to indicate the epoch is still ongoing
+                end_block = None
+        else:
+            # This should not happen due to the future epoch check above,
+            # but included for completeness
+            end_block = None
 
         return start_block, end_block
 

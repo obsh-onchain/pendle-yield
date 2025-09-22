@@ -151,11 +151,11 @@ class PendleYieldClient:
             List of enriched vote events for the epoch
 
         Raises:
-            ValidationError: If epoch is invalid
+            ValidationError: If epoch is invalid or current/future
             APIError: If any API request fails
         """
         # Get block range from epoch
-        from_block, to_block = epoch.get_block_range(self._etherscan_client)
+        from_block, to_block = epoch.get_block_range(self._etherscan_client, use_latest_for_current=True)
 
         # Delegate to existing get_votes method
         return self.get_votes(from_block, to_block)

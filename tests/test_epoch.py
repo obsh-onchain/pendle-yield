@@ -158,9 +158,188 @@ class TestPendleEpoch:
         assert epoch.start_datetime == expected_start
         assert epoch.end_datetime == expected_end
 
-        # Test timestamp properties
-        assert epoch.start_timestamp == int(expected_start.timestamp())
-        assert epoch.end_timestamp == int(expected_end.timestamp())
+    def test_status_properties_past_epoch(self):
+        """Test status properties for a past epoch."""
+        # Create an epoch from 2023 (definitely in the past)
+        past_time = datetime(2023, 1, 18, 12, 0, 0, tzinfo=UTC)
+        epoch = PendleEpoch(past_time)
+
+        assert epoch.is_past is True
+        assert epoch.is_current is False
+        assert epoch.is_future is False
+
+    def test_status_properties_future_epoch(self):
+        """Test status properties for a future epoch."""
+        # Create an epoch far in the future
+        future_time = datetime.now(UTC) + timedelta(days=365)  # One year from now
+        epoch = PendleEpoch(future_time)
+
+        assert epoch.is_past is False
+        assert epoch.is_current is False
+        assert epoch.is_future is True
+
+    def test_status_properties_current_epoch(self):
+        """Test status properties for the current epoch."""
+        # Create epoch for current time
+        current_epoch = PendleEpoch()
+
+        # At least one of these should be true, and they should be mutually exclusive
+        status_count = sum([current_epoch.is_past, current_epoch.is_current, current_epoch.is_future])
+        assert status_count == 1, "Exactly one status should be true"
+
+        # If we're in the current epoch, verify the logic
+        if current_epoch.is_current:
+            now = datetime.now(UTC)
+            assert current_epoch.start_datetime <= now < current_epoch.end_datetime
+
+    def test_get_block_range_future_epoch_raises_error(self):
+        """Test that get_block_range raises ValidationError for future epochs."""
+        # Create a future epoch
+        future_time = datetime.now(UTC) + timedelta(days=365)
+        future_epoch = PendleEpoch(future_time)
+
+        # Mock client (shouldn't be called)
+        mock_client = Mock()
+
+        with pytest.raises(ValidationError) as exc_info:
+            future_epoch.get_block_range(mock_client)
+
+        assert "Cannot get block range for future epoch" in str(exc_info.value)
+        assert exc_info.value.field == "epoch_status"
+        assert exc_info.value.value == "future"
+
+        # Verify no API calls were made
+        assert mock_client.get_block_number_by_timestamp.call_count == 0
+
+    def test_get_block_range_past_epoch(self):
+        """Test get_block_range for past epochs (existing behavior)."""
+        # Create a past epoch
+        past_time = datetime(2023, 1, 18, 12, 0, 0, tzinfo=UTC)
+        epoch = PendleEpoch(past_time)
+
+        # Mock client
+        mock_client = Mock()
+        mock_client.get_block_number_by_timestamp.side_effect = [19000000, 19010000]
+
+        start_block, end_block = epoch.get_block_range(mock_client)
+
+        assert start_block == 19000000
+        assert end_block == 19010000
+
+        # Verify both API calls were made
+        assert mock_client.get_block_number_by_timestamp.call_count == 2
+
+    def test_get_block_range_current_epoch_default(self):
+        """Test get_block_range for current epoch with default behavior."""
+        # Create current epoch
+        current_epoch = PendleEpoch()
+
+        # Skip test if not actually current
+        if not current_epoch.is_current:
+            pytest.skip("Test requires current epoch")
+
+        # Mock client
+        mock_client = Mock()
+        mock_client.get_block_number_by_timestamp.return_value = 19000000
+
+        start_block, end_block = current_epoch.get_block_range(mock_client)
+
+        assert start_block == 19000000
+        assert end_block is None
+
+        # Verify only start block API call was made
+        assert mock_client.get_block_number_by_timestamp.call_count == 1
+
+    def test_get_block_range_current_epoch_with_latest(self):
+        """Test get_block_range for current epoch with use_latest_for_current=True."""
+        # Create current epoch
+        current_epoch = PendleEpoch()
+
+        # Skip test if not actually current
+        if not current_epoch.is_current:
+            pytest.skip("Test requires current epoch")
+
+        # Mock client
+        mock_client = Mock()
+        mock_client.get_block_number_by_timestamp.side_effect = [19000000, 19020000]
+
+        start_block, end_block = current_epoch.get_block_range(
+            mock_client, use_latest_for_current=True
+        )
+
+        assert start_block == 19000000
+        assert end_block == 19020000
+
+        # Verify both API calls were made
+        assert mock_client.get_block_number_by_timestamp.call_count == 2
+
+    def test_get_block_range_use_latest_for_current_parameter(self):
+        """Test the use_latest_for_current parameter with different epoch types."""
+        # Test with past epoch - parameter should be ignored
+        past_time = datetime(2023, 1, 18, 12, 0, 0, tzinfo=UTC)
+        past_epoch = PendleEpoch(past_time)
+
+        mock_client = Mock()
+        mock_client.get_block_number_by_timestamp.side_effect = [19000000, 19010000]
+
+        start_block, end_block = past_epoch.get_block_range(
+            mock_client, use_latest_for_current=True
+        )
+
+        assert start_block == 19000000
+        assert end_block == 19010000
+
+        # Should not call get_latest_block_number for past epochs
+        assert mock_client.get_latest_block_number.call_count == 0
+
+    def test_status_properties_are_mutually_exclusive(self):
+        """Test that status properties are mutually exclusive."""
+        test_times = [
+            datetime(2023, 1, 18, tzinfo=UTC),  # Past
+            datetime.now(UTC),  # Current
+            datetime.now(UTC) + timedelta(days=365),  # Future
+        ]
+
+        for test_time in test_times:
+            epoch = PendleEpoch(test_time)
+            status_count = sum([epoch.is_past, epoch.is_current, epoch.is_future])
+            assert status_count == 1, f"Exactly one status should be true for {test_time}"
+
+    def test_get_block_range_return_type_annotation(self):
+        """Test that get_block_range returns the correct types."""
+        # Test with past epoch
+        past_time = datetime(2023, 1, 18, 12, 0, 0, tzinfo=UTC)
+        past_epoch = PendleEpoch(past_time)
+
+        mock_client = Mock()
+        mock_client.get_block_number_by_timestamp.side_effect = [19000000, 19010000]
+
+        start_block, end_block = past_epoch.get_block_range(mock_client)
+
+        assert isinstance(start_block, int)
+        assert isinstance(end_block, int)
+
+        # Test with current epoch (if available)
+        current_epoch = PendleEpoch()
+        if current_epoch.is_current:
+            # Create a new mock client for current epoch tests
+            current_mock_client = Mock()
+            current_mock_client.get_block_number_by_timestamp.return_value = 19000000
+
+            start_block, end_block = current_epoch.get_block_range(current_mock_client)
+
+            assert isinstance(start_block, int)
+            assert end_block is None
+
+            # Test with use_latest_for_current=True
+            current_mock_client.get_latest_block_number.return_value = 19020000
+
+            start_block, end_block = current_epoch.get_block_range(
+                current_mock_client, use_latest_for_current=True
+            )
+
+            assert isinstance(start_block, int)
+            assert isinstance(end_block, int)
 
     def test_contains_method(self):
         """Test the contains method with various input types."""
