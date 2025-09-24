@@ -5,6 +5,7 @@ This module contains the PendleYieldClient class, which provides the primary
 interface for interacting with Pendle Finance data.
 """
 
+from datetime import datetime
 from typing import Any
 
 from .epoch import PendleEpoch
@@ -135,6 +136,29 @@ class PendleYieldClient:
             if pool_info is not None:
                 enriched_vote = EnrichedVoteEvent.from_vote_and_pool(
                     vote_event, pool_info
+                )
+                enriched_votes.append(enriched_vote)
+            else:
+                # Create a dummy pool info for historical pools not in current API
+                from .models import PoolInfo
+                dummy_pool_info = PoolInfo(
+                    id=f"1-{vote_event.pool_address}",
+                    chainId=1,
+                    address=vote_event.pool_address,
+                    symbol="UNKNOWN",
+                    expiry=datetime(2025, 1, 1),  # Default expiry
+                    protocol="Unknown",
+                    underlyingPool="",
+                    voterApy=0.0,
+                    accentColor="#000000",
+                    name="Historical Pool",
+                    farmSimpleName="Historical Pool",
+                    farmSimpleIcon="",
+                    farmProName="Historical Pool",
+                    farmProIcon=""
+                )
+                enriched_vote = EnrichedVoteEvent.from_vote_and_pool(
+                    vote_event, dummy_pool_info
                 )
                 enriched_votes.append(enriched_vote)
 
