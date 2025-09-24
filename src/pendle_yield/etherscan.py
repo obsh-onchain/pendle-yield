@@ -429,7 +429,11 @@ class EtherscanClient:
                 raise ValidationError(f"Invalid response format: {str(e)}") from e
 
             if etherscan_response.status != "1":
-                # Include more details about the error
+                # Handle "No records found" gracefully - this is normal for empty block ranges
+                if etherscan_response.message == "No records found":
+                    return []  # Return empty list instead of raising error
+
+                # Include more details about other errors
                 error_details = {
                     "status": etherscan_response.status,
                     "message": etherscan_response.message,
@@ -564,7 +568,11 @@ class EtherscanClient:
                 raise ValidationError(f"Invalid response format: {str(e)}") from e
 
             if etherscan_response.status != "1":
-                # Include more details about the error
+                # Handle "No records found" gracefully - this is normal for empty block ranges
+                if etherscan_response.message == "No records found":
+                    return []  # Return empty list instead of raising error
+
+                # Include more details about other errors
                 error_details = {
                     "status": etherscan_response.status,
                     "message": etherscan_response.message,
