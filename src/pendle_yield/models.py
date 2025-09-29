@@ -275,3 +275,41 @@ class VoterAprResponse(BaseModel):
         ..., alias="totalFee", description="Total fee across all pools"
     )
     timestamp: datetime = Field(..., description="Response timestamp")
+
+
+class MarketInfo(BaseModel):
+    """Market information for market fees API."""
+
+    id: str = Field(..., description="Market ID")
+
+
+class MarketFeeValue(BaseModel):
+    """Individual fee data point for a market."""
+
+    time: datetime = Field(..., description="Timestamp of the fee data")
+    total_fees: float = Field(
+        ..., alias="totalFees", description="Total fees for this period"
+    )
+
+    @field_validator("total_fees")
+    @classmethod
+    def validate_total_fees_non_negative(cls, v: float) -> float:
+        """Validate that total fees are non-negative."""
+        if v < 0:
+            raise ValueError("Total fees must be non-negative")
+        return v
+
+
+class MarketFeeData(BaseModel):
+    """Market fee data containing market info and fee values."""
+
+    market: MarketInfo = Field(..., description="Market information")
+    values: list[MarketFeeValue] = Field(
+        ..., description="List of fee values over time"
+    )
+
+
+class MarketFeesResponse(BaseModel):
+    """Response from the market fees chart API endpoint."""
+
+    results: list[MarketFeeData] = Field(..., description="List of market fee data")

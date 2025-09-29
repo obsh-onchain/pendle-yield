@@ -11,7 +11,7 @@ from typing import Any
 from .epoch import PendleEpoch
 from .etherscan import EtherscanClient
 from .exceptions import APIError, ValidationError
-from .models import EnrichedVoteEvent, SwapEvent, VoteEvent
+from .models import EnrichedVoteEvent, MarketFeesResponse, SwapEvent, VoteEvent
 from .pendle import PendleClient
 
 
@@ -141,6 +141,7 @@ class PendleYieldClient:
             else:
                 # Create a dummy pool info for historical pools not in current API
                 from .models import PoolInfo
+
                 dummy_pool_info = PoolInfo(
                     id=f"1-{vote_event.pool_address}",
                     chainId=1,
@@ -155,7 +156,7 @@ class PendleYieldClient:
                     farmSimpleName="Historical Pool",
                     farmSimpleIcon="",
                     farmProName="Historical Pool",
-                    farmProIcon=""
+                    farmProIcon="",
                 )
                 enriched_vote = EnrichedVoteEvent.from_vote_and_pool(
                     vote_event, dummy_pool_info
@@ -211,3 +212,22 @@ class PendleYieldClient:
             APIError: If the API request fails
         """
         return self._etherscan_client.get_swap_events(from_block, to_block)
+
+    def get_market_fees_for_period(
+        self, timestamp_start: str, timestamp_end: str
+    ) -> MarketFeesResponse:
+        """
+        Get market fees chart data for a specific time period.
+
+        Args:
+            timestamp_start: Start timestamp in ISO format (e.g., "2025-07-30")
+            timestamp_end: End timestamp in ISO format (e.g., "2025-09-01")
+
+        Returns:
+            Market fees response containing fee data for all markets
+
+        Raises:
+            APIError: If the API request fails
+            ValidationError: If the response format is invalid
+        """
+        return self._pendle_client.get_market_fees_chart(timestamp_start, timestamp_end)

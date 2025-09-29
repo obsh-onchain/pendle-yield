@@ -12,7 +12,7 @@ import httpx
 from pydantic import ValidationError as PydanticValidationError
 
 from .exceptions import APIError, RateLimitError, ValidationError
-from .models import VoterAprResponse
+from .models import MarketFeesResponse, VoterAprResponse
 
 
 class PendleClient:
@@ -138,3 +138,35 @@ class PendleClient:
             return VoterAprResponse(**response_data)
         except PydanticValidationError as e:
             raise ValidationError(f"Invalid voter APR response format: {str(e)}") from e
+
+    def get_market_fees_chart(
+        self, timestamp_start: str, timestamp_end: str
+    ) -> MarketFeesResponse:
+        """
+        Fetch market fees chart data from the Pendle API.
+
+        Args:
+            timestamp_start: Start timestamp in ISO format (e.g., "2025-07-30")
+            timestamp_end: End timestamp in ISO format (e.g., "2025-09-01")
+
+        Returns:
+            Market fees response containing fee data for all markets
+
+        Raises:
+            APIError: If the API request fails
+            ValidationError: If the response format is invalid
+        """
+        url = f"{self.base_url}/v1/ve-pendle/market-fees-chart"
+        params = {
+            "timestamp_start": timestamp_start,
+            "timestamp_end": timestamp_end,
+        }
+
+        response_data = self._make_request(url, params)
+
+        try:
+            return MarketFeesResponse(**response_data)
+        except PydanticValidationError as e:
+            raise ValidationError(
+                f"Invalid market fees response format: {str(e)}"
+            ) from e
