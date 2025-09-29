@@ -13,13 +13,16 @@ pip install pendle-yield
 ## Quick Start
 
 ```python
-from pendle_yield import PendleYieldClient
+from pendle_yield import PendleEpoch, PendleYieldClient
 
 # Initialize with your Etherscan API key
 client = PendleYieldClient(etherscan_api_key="your_api_key_here")
 
-# Get enriched vote events for a specific blopck
-votes = client.get_votes(block_number=23251350)
+# Create epoch object, epoch starts on Th 00:00:00 and ends on Wd 23:59:59
+epoch = PendleEpoch("2025-08-21")
+
+# Get enriched vote events for the epoch
+votes = client.get_votes_by_epoch(epoch)
 
 # Display vote information
 for vote in votes:
@@ -33,8 +36,8 @@ for vote in votes:
 
 ## What it does now
 
-The `get_votes()` method:
-1. Fetches vote events from Etherscan for the specified block number
+The `get_votes_by_epoch()` method:
+1. Fetches vote events from Etherscan for the specified Pendle epoch
 2. Enriches them with pool metadata from Pendle Finance API
 3. Returns structured data combining both sources
 
