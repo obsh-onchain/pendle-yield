@@ -65,3 +65,11 @@ pdm run pytest
 
 # Run the example
 pdm run python examples/basic_usage.py
+```
+
+### Pendle API
+
+To update pendle client
+```
+openapi-python-client generate --url https://api-v2.pendle.finance/core/docs-json --meta pdm --output-path src --config openapi.yaml --overwrite
+```

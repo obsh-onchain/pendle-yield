@@ -38,6 +38,7 @@ dev = [
     "mypy>=1.5.0",
     "pytest>=7.4.0",
     "types-requests>=2.31.0",
+    "openapi-python-client>=0.26.2",
 ]
 docs = [
     "mkdocs>=1.5.0",
@@ -62,9 +63,9 @@ dev = [
 ]
 
 [tool.pdm.scripts]
-lint = "ruff check src tests"
-format = "ruff format src tests"
-type-check = "mypy src"
+lint = "ruff check src/pendle_yield tests"
+format = "ruff format src/pendle_yield tests"
+type-check = "mypy src/pendle_yield"
 test = "pytest"
 check-all = {composite = ["lint", "type-check", "test"]}
 
@@ -120,4 +121,9 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
+]
+
+[dependency-groups]
+dev = [
+    "openapi-python-client>=0.26.2",
 ]

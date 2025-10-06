@@ -19,13 +19,11 @@ from .exceptions import (
     RateLimitError,
     ValidationError,
 )
-from .pendle import PendleClient
 
 __all__ = [
     "PendleYieldClient",
     "PendleEpoch",
     "EtherscanClient",
-    "PendleClient",
     "PendleYieldError",
     "APIError",
     "ValidationError",

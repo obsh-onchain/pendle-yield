@@ -6,13 +6,33 @@ interface for interacting with Pendle Finance data.
 """
 
 from datetime import datetime
+from datetime import datetime as dt
 from typing import Any
+
+import httpx
+
+from pendle_v2 import Client as PendleV2Client
+from pendle_v2.api.ve_pendle import (
+    ve_pendle_controller_all_market_total_fees,
+    ve_pendle_controller_get_pool_voter_apr_and_swap_fee,
+)
+from pendle_v2.types import UNSET
 
 from .epoch import PendleEpoch
 from .etherscan import EtherscanClient
 from .exceptions import APIError, ValidationError
-from .models import EnrichedVoteEvent, MarketFeesResponse, SwapEvent, VoteEvent
-from .pendle import PendleClient
+from .models import (
+    EnrichedVoteEvent,
+    MarketFeeData,
+    MarketFeesResponse,
+    MarketFeeValue,
+    MarketInfo,
+    PoolInfo,
+    PoolVoterData,
+    SwapEvent,
+    VoteEvent,
+    VoterAprResponse,
+)
 
 
 class PendleYieldClient:
@@ -59,10 +79,9 @@ class PendleYieldClient:
             timeout=timeout,
             max_retries=max_retries,
         )
-        self._pendle_client = PendleClient(
+        self._pendle_v2_client = PendleV2Client(
             base_url=pendle_base_url,
-            timeout=timeout,
-            max_retries=max_retries,
+            timeout=httpx.Timeout(timeout),
         )
 
     def __enter__(self) -> "PendleYieldClient":
@@ -76,7 +95,7 @@ class PendleYieldClient:
     def close(self) -> None:
         """Close the HTTP clients."""
         self._etherscan_client.close()
-        self._pendle_client.close()
+        self._pendle_v2_client.get_httpx_client().close()
 
     def get_vote_events(self, from_block: int, to_block: int) -> list[VoteEvent]:
         """
@@ -118,7 +137,7 @@ class PendleYieldClient:
 
         # Fetch voter APR data from Pendle API (contains pool information)
         try:
-            voter_apr_response = self._pendle_client.get_pool_voter_apr_data()
+            voter_apr_response = self._get_pool_voter_apr_data()
         except APIError:
             # If we can't fetch voter APR data, return vote events without enrichment
             return []
@@ -230,4 +249,133 @@ class PendleYieldClient:
             APIError: If the API request fails
             ValidationError: If the response format is invalid
         """
-        return self._pendle_client.get_market_fees_chart(timestamp_start, timestamp_end)
+        return self._get_market_fees_chart(timestamp_start, timestamp_end)
+
+    def _get_pool_voter_apr_data(self) -> VoterAprResponse:
+        """
+        Fetch pool voter APR data from the Pendle V2 API.
+
+        Returns:
+            Voter APR response containing pool data with APR metrics
+
+        Raises:
+            APIError: If the API request fails
+        """
+        try:
+            response = ve_pendle_controller_get_pool_voter_apr_and_swap_fee.sync(
+                client=self._pendle_v2_client,
+                order_by="voterApr:-1",
+            )
+
+            if response is None:
+                raise APIError("Failed to fetch pool voter APR data")
+
+            # Convert pendle_v2 response to our VoterAprResponse model
+            pool_voter_data_list = []
+            for result in response.results:
+                # Handle optional fields
+                protocol = (
+                    result.pool.protocol
+                    if not isinstance(result.pool.protocol, type(UNSET))
+                    else "Unknown"
+                )
+                underlying_pool = (
+                    result.pool.underlying_pool
+                    if not isinstance(result.pool.underlying_pool, type(UNSET))
+                    else ""
+                )
+                accent_color = (
+                    result.pool.accent_color
+                    if not isinstance(result.pool.accent_color, type(UNSET))
+                    else "#000000"
+                )
+
+                # Convert pool data
+                pool_info = PoolInfo(
+                    id=result.pool.id,
+                    chainId=int(result.pool.chain_id),
+                    address=result.pool.address,
+                    symbol=result.pool.symbol,
+                    expiry=dt.fromisoformat(result.pool.expiry),
+                    protocol=protocol if protocol else "Unknown",
+                    underlyingPool=underlying_pool if underlying_pool else "",
+                    voterApy=result.pool.voter_apy,
+                    accentColor=accent_color if accent_color else "#000000",
+                    name=result.pool.name,
+                    farmSimpleName=result.pool.farm_simple_name,
+                    farmSimpleIcon=result.pool.farm_simple_icon,
+                    farmProName=result.pool.farm_pro_name,
+                    farmProIcon=result.pool.farm_pro_icon,
+                )
+
+                pool_voter_data = PoolVoterData(
+                    pool=pool_info,
+                    currentVoterApr=result.current_voter_apr,
+                    lastEpochVoterApr=result.last_epoch_voter_apr,
+                    currentSwapFee=result.current_swap_fee,
+                    lastEpochSwapFee=result.last_epoch_swap_fee,
+                    projectedVoterApr=result.projected_voter_apr,
+                )
+                pool_voter_data_list.append(pool_voter_data)
+
+            return VoterAprResponse(
+                results=pool_voter_data_list,
+                totalPools=int(response.total_pools),
+                totalFee=response.total_fee,
+                timestamp=response.timestamp,
+            )
+        except Exception as e:
+            raise APIError(f"Failed to fetch pool voter APR data: {str(e)}") from e
+
+    def _get_market_fees_chart(
+        self, timestamp_start: str, timestamp_end: str
+    ) -> MarketFeesResponse:
+        """
+        Fetch market fees chart data from the Pendle V2 API.
+
+        Args:
+            timestamp_start: Start timestamp in ISO format (e.g., "2025-07-30")
+            timestamp_end: End timestamp in ISO format (e.g., "2025-09-01")
+
+        Returns:
+            Market fees response containing fee data for all markets
+
+        Raises:
+            APIError: If the API request fails
+        """
+        try:
+            # Parse ISO format timestamps to datetime objects
+            start_dt = dt.fromisoformat(timestamp_start)
+            end_dt = dt.fromisoformat(timestamp_end)
+
+            response = ve_pendle_controller_all_market_total_fees.sync(
+                client=self._pendle_v2_client,
+                timestamp_start=start_dt,
+                timestamp_end=end_dt,
+            )
+
+            if response is None:
+                raise APIError("Failed to fetch market fees data")
+
+            # Convert pendle_v2 response to our MarketFeesResponse model
+            market_fee_data_list = []
+            for result in response.results:
+                market_info = MarketInfo(id=result.market.id)
+
+                fee_values = [
+                    MarketFeeValue(
+                        time=value.time,
+                        totalFees=value.total_fees,
+                    )
+                    for value in result.values
+                ]
+
+                market_fee_data = MarketFeeData(
+                    market=market_info,
+                    values=fee_values,
+                )
+                market_fee_data_list.append(market_fee_data)
+
+            return MarketFeesResponse(results=market_fee_data_list)
+        except Exception as e:
+            raise APIError(f"Failed to fetch market fees data: {str(e)}") from e

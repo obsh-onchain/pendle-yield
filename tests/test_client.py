@@ -129,8 +129,8 @@ class TestPendleYieldClient:
 
         with patch.object(client, "get_vote_events", return_value=[mock_vote_event]):
             with patch.object(
-                client._pendle_client,
-                "get_pool_voter_apr_data",
+                client,
+                "_get_pool_voter_apr_data",
                 return_value=mock_voter_apr_response,
             ):
                 enriched_votes = client.get_votes(12345, 12345)
