@@ -6,8 +6,11 @@ The primary goal is to simplify data access for developers, analysts, and enthus
 
 ## Installation
 
+> ⚠️ **Alpha Version**: This package is under active development. APIs may change between releases.
+
+Your can install latest alpha version from TestPyPI:
 ```bash
-pip install pendle-yield
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ pendle-yield
 ```
 
 ## Quick Start
