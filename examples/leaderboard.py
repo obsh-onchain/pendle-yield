@@ -14,11 +14,9 @@ User, Total Rewards, USDT per 1000 vePENDLE, vePENDLE Balance
 
 import os
 from collections import defaultdict
-from datetime import datetime
-from typing import Dict, List, Tuple
 
 from pendle_yield import PendleEpoch, PendleYieldClient
-from pendle_yield.models import EnrichedVoteEvent, MarketFeeData
+from pendle_yield.models import EnrichedVoteEvent
 
 
 def format_address(address: str) -> str:
@@ -26,36 +24,47 @@ def format_address(address: str) -> str:
     return f"{address[:6]}...{address[-4:]}"
 
 
-def get_august_2025_epochs() -> List[PendleEpoch]:
+def get_august_2025_epochs() -> tuple[list[PendleEpoch], list[PendleEpoch]]:
     """
     Get the Pendle epochs for August 2025.
 
     According to the task, we need epochs that ended in August:
-    - July 31 epoch (ends Aug 7)
-    - Aug 7 epoch (ends Aug 14)
-    - Aug 14 epoch (ends Aug 21)
-    - Aug 21 epoch (ends Aug 28)
+    - July 31 epoch (ends Aug 7) - uses votes from July 24 epoch
+    - Aug 7 epoch (ends Aug 14) - uses votes from July 31 epoch
+    - Aug 14 epoch (ends Aug 21) - uses votes from Aug 7 epoch
+    - Aug 21 epoch (ends Aug 28) - uses votes from Aug 14 epoch
 
     We exclude the Aug 28 epoch as specified.
+
+    Returns:
+        Tuple of (fee_epochs, vote_epochs) where vote_epochs[i] determines
+        rewards for fee_epochs[i]
     """
-    epoch_dates = [
+    # Epochs where we collect fees (August 2025)
+    fee_epoch_dates = [
         "2025-07-31",  # Epoch ending Aug 7
         "2025-08-07",  # Epoch ending Aug 14
         "2025-08-14",  # Epoch ending Aug 21
         "2025-08-21",  # Epoch ending Aug 28
     ]
 
-    epochs = []
-    for date_str in epoch_dates:
-        epoch = PendleEpoch(date_str)
-        epochs.append(epoch)
+    # Previous epochs where votes were cast that determine August rewards
+    vote_epoch_dates = [
+        "2025-07-24",  # Votes for July 31 epoch
+        "2025-07-31",  # Votes for Aug 7 epoch
+        "2025-08-07",  # Votes for Aug 14 epoch
+        "2025-08-14",  # Votes for Aug 21 epoch
+    ]
 
-    return epochs
+    fee_epochs = [PendleEpoch(date_str) for date_str in fee_epoch_dates]
+    vote_epochs = [PendleEpoch(date_str) for date_str in vote_epoch_dates]
+
+    return fee_epochs, vote_epochs
 
 
 def calculate_epoch_end_ve_pendle_per_pool(
-    votes: List[EnrichedVoteEvent], epoch: PendleEpoch
-) -> Dict[Tuple[str, str], float]:
+    votes: list[EnrichedVoteEvent], epoch: PendleEpoch
+) -> dict[tuple[str, str], float]:
     """
     Calculate VePendle values at the end of an epoch for each voter per pool.
 
@@ -94,8 +103,8 @@ def calculate_epoch_end_ve_pendle_per_pool(
 
 
 def calculate_total_ve_pendle_per_voter(
-    voter_pool_ve_pendle: Dict[Tuple[str, str], float],
-) -> Dict[str, float]:
+    voter_pool_ve_pendle: dict[tuple[str, str], float],
+) -> dict[str, float]:
     """
     Calculate total VePendle for each voter across all pools.
 
@@ -107,15 +116,15 @@ def calculate_total_ve_pendle_per_voter(
     """
     voter_total_ve_pendle = defaultdict(float)
 
-    for (voter_addr, pool_addr), ve_pendle in voter_pool_ve_pendle.items():
+    for (voter_addr, _pool_addr), ve_pendle in voter_pool_ve_pendle.items():
         voter_total_ve_pendle[voter_addr] += ve_pendle
 
     return dict(voter_total_ve_pendle)
 
 
 def calculate_pool_rewards(
-    votes: List[EnrichedVoteEvent], epoch: PendleEpoch, pool_fees: Dict[str, float]
-) -> Dict[str, float]:
+    votes: list[EnrichedVoteEvent], epoch: PendleEpoch, pool_fees: dict[str, float]
+) -> dict[str, float]:
     """
     Calculate rewards for each voter based on their vote distribution.
 
@@ -170,10 +179,13 @@ def main():
     print()
 
     # Get August 2025 epochs
-    epochs = get_august_2025_epochs()
-    print(f"📅 Processing {len(epochs)} epochs for August 2025:")
-    for i, epoch in enumerate(epochs, 1):
-        print(f"   {i}. {epoch}")
+    fee_epochs, vote_epochs = get_august_2025_epochs()
+    print(f"📅 Processing {len(fee_epochs)} epochs for August 2025:")
+    print("   Note: Rewards are based on votes from the PREVIOUS epoch")
+    for i, (fee_epoch, vote_epoch) in enumerate(
+        zip(fee_epochs, vote_epochs, strict=True), 1
+    ):
+        print(f"   {i}. {fee_epoch} (using votes from {vote_epoch})")
     print()
 
     # Initialize the client
@@ -197,12 +209,16 @@ def main():
             total_user_rewards = defaultdict(float)
             total_user_ve_pendle = defaultdict(float)
 
-            for epoch_num, epoch in enumerate(epochs, 1):
-                print(f"\n📊 Processing Epoch {epoch_num}: {epoch}")
+            for epoch_num, (fee_epoch, vote_epoch) in enumerate(
+                zip(fee_epochs, vote_epochs, strict=True), 1
+            ):
+                print(f"\n📊 Processing Epoch {epoch_num}: {fee_epoch}")
+                print(f"   Using votes from: {vote_epoch}")
 
-                # Fetch votes for this epoch
+                # Fetch votes from the PREVIOUS epoch (vote_epoch)
+                # These votes determine rewards for the current fee_epoch
                 try:
-                    votes = client.get_votes_by_epoch(epoch)
+                    votes = client.get_votes_by_epoch(vote_epoch)
                     print(f"   Found {len(votes)} vote events")
                 except Exception as e:
                     print(f"   ❌ Error fetching votes: {e}")
@@ -212,9 +228,9 @@ def main():
                     print("   ⚠️  No votes found for this epoch")
                     continue
 
-                # Extract pool fees for this epoch
+                # Extract pool fees for the FEE epoch (not the vote epoch)
                 epoch_pool_fees = {}
-                epoch_start_str = epoch.start_datetime.strftime("%Y-%m-%d")
+                fee_epoch_start_str = fee_epoch.start_datetime.strftime("%Y-%m-%d")
 
                 for market_data in market_fees_response.results:
                     market_id = market_data.market.id
@@ -224,21 +240,24 @@ def main():
                     else:
                         continue
 
-                    # Find fees for this epoch
+                    # Find fees for the FEE epoch
                     for fee_value in market_data.values:
                         fee_date_str = fee_value.time.strftime("%Y-%m-%d")
-                        if fee_date_str == epoch_start_str:
+                        if fee_date_str == fee_epoch_start_str:
                             epoch_pool_fees[pool_address] = fee_value.total_fees
                             break
 
                 print(f"   Found fees for {len(epoch_pool_fees)} pools")
 
-                # Calculate rewards for this epoch
-                epoch_rewards = calculate_pool_rewards(votes, epoch, epoch_pool_fees)
+                # Calculate rewards using votes from vote_epoch and fees from fee_epoch
+                # Use vote_epoch for calculating VePendle values at the end of voting
+                epoch_rewards = calculate_pool_rewards(
+                    votes, vote_epoch, epoch_pool_fees
+                )
 
-                # Calculate VePendle balances at epoch end per pool
+                # Calculate VePendle balances at the end of the vote epoch
                 epoch_voter_pool_ve_pendle = calculate_epoch_end_ve_pendle_per_pool(
-                    votes, epoch
+                    votes, vote_epoch
                 )
 
                 # Calculate total VePendle per voter for this epoch
@@ -256,7 +275,7 @@ def main():
 
                 print(f"   Calculated rewards for {len(epoch_rewards)} voters")
 
-            print(f"\n💰 Final Results Summary")
+            print("\n💰 Final Results Summary")
             print(f"   Total unique voters: {len(total_user_rewards)}")
             print(
                 f"   Total rewards distributed: {sum(total_user_rewards.values()):.2f} USDT"
@@ -296,7 +315,7 @@ def main():
             # Sort by USDT per 1000 vePENDLE descending
             eligible_users.sort(key=lambda x: x["usdt_per_1000_ve"], reverse=True)
 
-            print(f"🏆 Pendle Voter Leaderboard (August 2025)")
+            print("🏆 Pendle Voter Leaderboard (August 2025)")
             print(f"   Showing users with ≥{MIN_VE_PENDLE:.0f} vePENDLE")
             print("=" * 80)
             print("#")
