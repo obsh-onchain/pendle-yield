@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Pendle Voter Leaderboard for August 2025
+Pendle Voter Leaderboard for September 2025
 
-This example reproduces the Pendle voter leaderboard for August 2025,
+This example reproduces the Pendle voter leaderboard for September 2025,
 calculating rewards based on vote distribution and pool fees.
 
 The leaderboard format:
@@ -24,36 +24,36 @@ def format_address(address: str) -> str:
     return f"{address[:6]}...{address[-4:]}"
 
 
-def get_august_2025_epochs() -> tuple[list[PendleEpoch], list[PendleEpoch]]:
+def get_september_2025_epochs() -> tuple[list[PendleEpoch], list[PendleEpoch]]:
     """
-    Get the Pendle epochs for August 2025.
+    Get the Pendle epochs for September 2025.
 
-    According to the task, we need epochs that ended in August:
-    - July 31 epoch (ends Aug 7) - uses votes from July 24 epoch
-    - Aug 7 epoch (ends Aug 14) - uses votes from July 31 epoch
-    - Aug 14 epoch (ends Aug 21) - uses votes from Aug 7 epoch
-    - Aug 21 epoch (ends Aug 28) - uses votes from Aug 14 epoch
+    According to the task, we need epochs that ended in September:
+    - Aug 28 epoch (ends Sep 4) - uses votes from Aug 21 epoch
+    - Sep 4 epoch (ends Sep 11) - uses votes from Aug 28 epoch
+    - Sep 11 epoch (ends Sep 18) - uses votes from Sep 4 epoch
+    - Sep 18 epoch (ends Sep 25) - uses votes from Sep 11 epoch
 
-    We exclude the Aug 28 epoch as specified.
+    We exclude the Sep 25 epoch as specified.
 
     Returns:
         Tuple of (fee_epochs, vote_epochs) where vote_epochs[i] determines
         rewards for fee_epochs[i]
     """
-    # Epochs where we collect fees (August 2025)
+    # Epochs where we collect fees (September 2025)
     fee_epoch_dates = [
-        "2025-07-31",  # Epoch ending Aug 7
-        "2025-08-07",  # Epoch ending Aug 14
-        "2025-08-14",  # Epoch ending Aug 21
-        "2025-08-21",  # Epoch ending Aug 28
+        "2025-08-28",  # Epoch ending Sep 4
+        "2025-09-04",  # Epoch ending Sep 11
+        "2025-09-11",  # Epoch ending Sep 18
+        "2025-09-18",  # Epoch ending Sep 25
     ]
 
-    # Previous epochs where votes were cast that determine August rewards
+    # Previous epochs where votes were cast that determine September rewards
     vote_epoch_dates = [
-        "2025-07-24",  # Votes for July 31 epoch
-        "2025-07-31",  # Votes for Aug 7 epoch
-        "2025-08-07",  # Votes for Aug 14 epoch
-        "2025-08-14",  # Votes for Aug 21 epoch
+        "2025-08-21",  # Votes for Aug 28 epoch
+        "2025-08-28",  # Votes for Sep 4 epoch
+        "2025-09-04",  # Votes for Sep 11 epoch
+        "2025-09-11",  # Votes for Sep 18 epoch
     ]
 
     fee_epochs = [PendleEpoch(date_str) for date_str in fee_epoch_dates]
@@ -175,12 +175,12 @@ def main():
         print("Please set your Etherscan API key and try again.")
         return
 
-    print("=== Pendle Voter Leaderboard for August 2025 ===")
+    print("=== Pendle Voter Leaderboard for September 2025 ===")
     print()
 
-    # Get August 2025 epochs
-    fee_epochs, vote_epochs = get_august_2025_epochs()
-    print(f"📅 Processing {len(fee_epochs)} epochs for August 2025:")
+    # Get September 2025 epochs
+    fee_epochs, vote_epochs = get_september_2025_epochs()
+    print(f"📅 Processing {len(fee_epochs)} epochs for September 2025:")
     print("   Note: Rewards are based on votes from the PREVIOUS epoch")
     for i, (fee_epoch, vote_epoch) in enumerate(
         zip(fee_epochs, vote_epochs, strict=True), 1
@@ -196,7 +196,7 @@ def main():
             # Fetch market fees for the period
             try:
                 market_fees_response = client.get_market_fees_for_period(
-                    "2025-07-30", "2025-09-01"
+                    "2025-08-27", "2025-10-01"
                 )
                 print(
                     f"   Found fee data for {len(market_fees_response.results)} markets"
@@ -315,7 +315,7 @@ def main():
             # Sort by USDT per 1000 vePENDLE descending
             eligible_users.sort(key=lambda x: x["usdt_per_1000_ve"], reverse=True)
 
-            print("🏆 Pendle Voter Leaderboard (August 2025)")
+            print("🏆 Pendle Voter Leaderboard (September 2025)")
             print(f"   Showing users with ≥{MIN_VE_PENDLE:.0f} vePENDLE")
             print("=" * 80)
             print("#")
