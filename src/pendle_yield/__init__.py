@@ -13,6 +13,7 @@ __author__ = "obsh-onchain"
 from .client import PendleYieldClient
 from .epoch import PendleEpoch
 from .etherscan import EtherscanClient
+from .etherscan_cached import CachedEtherscanClient
 from .exceptions import (
     APIError,
     PendleYieldError,
@@ -24,6 +25,7 @@ __all__ = [
     "PendleYieldClient",
     "PendleEpoch",
     "EtherscanClient",
+    "CachedEtherscanClient",
     "PendleYieldError",
     "APIError",
     "ValidationError",
