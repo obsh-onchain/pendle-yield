@@ -29,7 +29,6 @@ from .models import (
     MarketInfo,
     PoolInfo,
     PoolVoterData,
-    SwapEvent,
     VoteEvent,
     VoterAprResponse,
 )
@@ -214,23 +213,6 @@ class PendleYieldClient:
 
         # Delegate to existing get_votes method
         return self.get_votes(from_block, to_block)
-
-    def get_swap_events(self, from_block: int, to_block: int) -> list[SwapEvent]:
-        """
-        Fetch swap events for a specific block range from Etherscan.
-
-        Args:
-            from_block: Starting block number
-            to_block: Ending block number
-
-        Returns:
-            List of swap events
-
-        Raises:
-            ValidationError: If block numbers are invalid
-            APIError: If the API request fails
-        """
-        return self._etherscan_client.get_swap_events(from_block, to_block)
 
     def get_market_fees_for_period(
         self, timestamp_start: str, timestamp_end: str

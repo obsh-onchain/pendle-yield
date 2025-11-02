@@ -40,39 +40,6 @@ class VoteEvent(BaseModel):
         return v
 
 
-class SwapEvent(BaseModel):
-    """Represents a swap event from the Etherscan API."""
-
-    block_number: int = Field(..., description="Block number where the swap occurred")
-    transaction_hash: str = Field(..., description="Transaction hash of the swap")
-    pool_address: str = Field(
-        ..., description="Address of the pool where swap occurred"
-    )
-    caller: str = Field(..., description="Address that initiated the swap")
-    receiver: str = Field(..., description="Address receiving the swap")
-    net_pt_out: int = Field(..., description="Net PT tokens out (can be negative)")
-    net_sy_out: int = Field(..., description="Net SY tokens out (can be negative)")
-    net_sy_fee: int = Field(..., description="Fee in SY tokens")
-    net_sy_to_reserve: int = Field(..., description="SY tokens to reserve")
-    timestamp: datetime | None = Field(None, description="Timestamp of the swap")
-
-    @field_validator("pool_address", "caller", "receiver")
-    @classmethod
-    def validate_ethereum_address(cls, v: str) -> str:
-        """Validate that the address is a valid Ethereum address format."""
-        if not v.startswith("0x") or len(v) != 42:
-            raise ValueError("Invalid Ethereum address format")
-        return v.lower()
-
-    @field_validator("net_sy_fee", "net_sy_to_reserve")
-    @classmethod
-    def validate_non_negative(cls, v: int) -> int:
-        """Validate that fee and reserve values are non-negative."""
-        if v < 0:
-            raise ValueError("Fee and reserve values must be non-negative")
-        return v
-
-
 class EnrichedVoteEvent(BaseModel):
     """Represents a vote event enriched with pool information."""
 

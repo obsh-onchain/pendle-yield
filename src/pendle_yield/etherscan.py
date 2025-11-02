@@ -2,7 +2,7 @@
 Etherscan API client for the pendle-yield package.
 
 This module provides functionality to interact with the Etherscan API
-to fetch blockchain data, specifically vote events and swap events.
+to fetch blockchain data, specifically vote events.
 """
 
 import time
@@ -13,13 +13,10 @@ import httpx
 from pydantic import ValidationError as PydanticValidationError
 
 from .exceptions import APIError, RateLimitError, ValidationError
-from .models import EtherscanResponse, SwapEvent, VoteEvent
+from .models import EtherscanResponse, VoteEvent
 
 # Topic for the 'Vote' event: Vote(address indexed user, address indexed pool, uint256 weight, int256 bias, int256 slope)
 VOTE_TOPIC = "0xc71e393f1527f71ce01b78ea87c9bd4fca84f1482359ce7ac9b73f358c61b1e1"
-
-# Topic for the 'Swap' event: Swap(address indexed caller, address indexed receiver, int256 netPtOut, int256 netSyOut, uint256 netSyFee, uint256 netSyToReserve)
-SWAP_TOPIC = "0x829000a5bc6a12d46e30cdcecd7c56b1efd88f6d7d059da6734a04f3764557c4"
 
 # Block batch size for handling Etherscan API limitation (page × offset ≤ 10,000)
 # This splits large block ranges into smaller chunks to avoid hitting the limit
@@ -181,95 +178,6 @@ class EtherscanClient:
                     continue
 
         return vote_events
-
-    def _parse_swap_events(
-        self, etherscan_response: EtherscanResponse
-    ) -> list[SwapEvent]:
-        """
-        Parse log entries into swap events.
-
-        Args:
-            etherscan_response: Validated Etherscan API response
-
-        Returns:
-            List of parsed swap events
-        """
-        swap_events = []
-        if isinstance(etherscan_response.result, list):
-            for log_entry in etherscan_response.result:
-                try:
-                    # Parse the log data to extract swap information
-                    # Swap event signature: Swap(address indexed caller, address indexed receiver, int256 netPtOut, int256 netSyOut, uint256 netSyFee, uint256 netSyToReserve)
-                    # topics[0] = event signature
-                    # topics[1] = caller address (indexed)
-                    # topics[2] = receiver address (indexed)
-                    # data contains: netPtOut, netSyOut, netSyFee, netSyToReserve (each 32 bytes / 64 hex chars)
-
-                    if len(log_entry.topics) < 3:
-                        continue  # Skip malformed entries
-
-                    # Extract addresses from topics (remove padding zeros)
-                    caller = "0x" + log_entry.topics[1][-40:]
-                    receiver = "0x" + log_entry.topics[2][-40:]
-
-                    # Parse data field - remove '0x' prefix and split into 64-char chunks
-                    data_hex = (
-                        log_entry.data[2:]
-                        if log_entry.data.startswith("0x")
-                        else log_entry.data
-                    )
-
-                    # Each parameter is 32 bytes (64 hex chars)
-                    # We need 4 parameters: netPtOut, netSyOut, netSyFee, netSyToReserve
-                    if len(data_hex) >= 256:  # 4 * 64 chars
-                        net_pt_out_hex = data_hex[0:64]
-                        net_sy_out_hex = data_hex[64:128]
-                        net_sy_fee_hex = data_hex[128:192]
-                        net_sy_to_reserve_hex = data_hex[192:256]
-
-                        # Convert hex to integers
-                        net_pt_out = int(net_pt_out_hex, 16)
-                        net_sy_out = int(net_sy_out_hex, 16)
-                        net_sy_fee = int(net_sy_fee_hex, 16)
-                        net_sy_to_reserve = int(net_sy_to_reserve_hex, 16)
-
-                        # Convert to signed integers for netPtOut and netSyOut (int256)
-                        if net_pt_out >= 2**255:
-                            net_pt_out = net_pt_out - 2**256
-
-                        if net_sy_out >= 2**255:
-                            net_sy_out = net_sy_out - 2**256
-
-                        # netSyFee and netSyToReserve are uint256, so they remain positive
-                    else:
-                        # Handle case where data might be shorter
-                        net_pt_out = 0
-                        net_sy_out = 0
-                        net_sy_fee = 0
-                        net_sy_to_reserve = 0
-
-                    # Convert hex timestamp to datetime
-                    timestamp_int = int(log_entry.time_stamp, 16)
-                    timestamp = datetime.fromtimestamp(timestamp_int)
-
-                    swap_event = SwapEvent(
-                        block_number=int(log_entry.block_number, 16),
-                        transaction_hash=log_entry.transaction_hash,
-                        pool_address=log_entry.address.lower(),
-                        caller=caller,
-                        receiver=receiver,
-                        net_pt_out=net_pt_out,
-                        net_sy_out=net_sy_out,
-                        net_sy_fee=net_sy_fee,
-                        net_sy_to_reserve=net_sy_to_reserve,
-                        timestamp=timestamp,
-                    )
-                    swap_events.append(swap_event)
-                except (ValueError, IndexError, AttributeError):
-                    # Skip malformed log entries
-                    continue
-
-        return swap_events
 
     def _make_request(
         self, url: str, params: dict[str, Any] | None = None
@@ -449,145 +357,6 @@ class EtherscanClient:
 
             # Parse log entries into vote events
             page_events = self._parse_vote_events(etherscan_response)
-            batch_events.extend(page_events)
-
-            # Check if we should continue pagination
-            if len(page_events) < 1000:
-                # Less than 1000 results means this is the last page
-                break
-
-            if max_pages is not None and page >= max_pages:
-                # Reached maximum page limit
-                break
-
-            # Check if we're approaching the API limit (page × offset ≤ 10,000)
-            if page >= 10:  # With offset=1000, page 10 gives us 10,000 results
-                # Stop pagination to avoid hitting the limit
-                break
-
-            page += 1
-
-        return batch_events
-
-    def get_swap_events(
-        self, from_block: int, to_block: int, max_pages: int | None = None
-    ) -> list[SwapEvent]:
-        """
-        Fetch swap events for all pools in a specific block range from Etherscan with pagination.
-
-        Uses block range batching to handle Etherscan API limitation where page × offset ≤ 10,000.
-        Large block ranges are split into smaller chunks to avoid hitting this limit.
-
-        Args:
-            from_block: Starting block number
-            to_block: Ending block number
-            max_pages: Maximum number of pages to fetch per block batch (None for unlimited)
-
-        Returns:
-            List of swap events from all pools
-
-        Raises:
-            ValidationError: If block numbers are invalid
-            APIError: If the API request fails
-        """
-        # Validate block numbers
-        if from_block <= 0 or to_block <= 0:
-            raise ValidationError(
-                "Block numbers must be positive",
-                field="block_numbers",
-                value=f"from_block={from_block}, to_block={to_block}",
-            )
-
-        if from_block > to_block:
-            raise ValidationError(
-                "from_block must be less than or equal to to_block",
-                field="block_range",
-                value=f"from_block={from_block}, to_block={to_block}",
-            )
-
-        all_swap_events = []
-
-        # Split the block range into batches to avoid Etherscan API limitation
-        current_from = from_block
-        while current_from <= to_block:
-            current_to = min(current_from + BLOCK_BATCH_SIZE - 1, to_block)
-
-            # Fetch events for current block batch with pagination
-            batch_events = self._get_swap_events_for_batch(
-                current_from, current_to, max_pages
-            )
-            all_swap_events.extend(batch_events)
-
-            current_from = current_to + 1
-
-        return all_swap_events
-
-    def _get_swap_events_for_batch(
-        self, from_block: int, to_block: int, max_pages: int | None = None
-    ) -> list[SwapEvent]:
-        """
-        Fetch swap events for a single block batch with pagination.
-
-        Args:
-            from_block: Starting block number for this batch
-            to_block: Ending block number for this batch
-            max_pages: Maximum number of pages to fetch (None for unlimited)
-
-        Returns:
-            List of swap events for this batch
-
-        Raises:
-            APIError: If the API request fails
-        """
-        batch_events = []
-        page = 1
-
-        while True:
-            # Enforce rate limiting before each request
-            self._enforce_rate_limit()
-
-            # Etherscan API parameters for getting logs with pagination
-            params = {
-                "chainid": "1",  # Ethereum mainnet
-                "module": "logs",
-                "action": "getLogs",
-                "fromBlock": str(from_block),
-                "toBlock": str(to_block),
-                "topic0": SWAP_TOPIC,  # Swap event signature
-                "page": str(page),
-                "offset": "1000",  # Maximum results per page
-                "apikey": self.api_key,
-            }
-
-            url = self.base_url
-            response_data = self._make_request(url, params)
-
-            try:
-                etherscan_response = EtherscanResponse(**response_data)
-            except PydanticValidationError as e:
-                raise ValidationError(f"Invalid response format: {str(e)}") from e
-
-            if etherscan_response.status != "1":
-                # Handle "No records found" gracefully - this is normal for empty block ranges
-                if etherscan_response.message == "No records found":
-                    return []  # Return empty list instead of raising error
-
-                # Include more details about other errors
-                error_details = {
-                    "status": etherscan_response.status,
-                    "message": etherscan_response.message,
-                    "result": etherscan_response.result,
-                    "params": params,
-                }
-                raise APIError(
-                    f"Etherscan API error: {etherscan_response.message}",
-                    status_code=None,
-                    response_text=str(error_details),
-                    url=url,
-                )
-
-            # Parse log entries into swap events
-            page_events = self._parse_swap_events(etherscan_response)
             batch_events.extend(page_events)
 
             # Check if we should continue pagination
