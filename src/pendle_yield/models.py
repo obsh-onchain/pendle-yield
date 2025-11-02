@@ -280,3 +280,60 @@ class MarketFeesResponse(BaseModel):
     """Response from the market fees chart API endpoint."""
 
     results: list[MarketFeeData] = Field(..., description="List of market fee data")
+
+
+class EpochMarketFee(BaseModel):
+    """Represents market fees for a specific epoch."""
+
+    chain_id: int = Field(..., description="Blockchain chain ID")
+    market_address: str = Field(..., description="Market contract address")
+    total_fee: float = Field(..., description="Total fees accumulated in the epoch")
+    epoch_start: datetime = Field(..., description="Epoch start timestamp")
+    epoch_end: datetime = Field(..., description="Epoch end timestamp")
+
+    @field_validator("market_address")
+    @classmethod
+    def validate_ethereum_address(cls, v: str) -> str:
+        """Validate that the address is a valid Ethereum address format."""
+        if not v.startswith("0x") or len(v) != 42:
+            raise ValueError("Invalid Ethereum address format")
+        return v.lower()
+
+    @field_validator("total_fee")
+    @classmethod
+    def validate_total_fee_non_negative(cls, v: float) -> float:
+        """Validate that total fee is non-negative."""
+        if v < 0:
+            raise ValueError("Total fee must be non-negative")
+        return v
+
+    @staticmethod
+    def parse_market_id(market_id: str) -> tuple[int, str]:
+        """
+        Parse market ID into chain_id and address.
+
+        Market IDs are in the format "chainId-address", e.g. "1-0x123..."
+
+        Args:
+            market_id: Market ID string
+
+        Returns:
+            Tuple of (chain_id, address)
+
+        Raises:
+            ValueError: If market ID format is invalid
+        """
+        parts = market_id.split("-", 1)
+        if len(parts) != 2:
+            raise ValueError(f"Invalid market ID format: {market_id}")
+
+        try:
+            chain_id = int(parts[0])
+        except ValueError as e:
+            raise ValueError(f"Invalid chain ID in market ID: {market_id}") from e
+
+        address = parts[1]
+        if not address.startswith("0x"):
+            address = f"0x{address}"
+
+        return chain_id, address

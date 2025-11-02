@@ -20,6 +20,7 @@ from .exceptions import (
     RateLimitError,
     ValidationError,
 )
+from .models import EpochMarketFee
 
 __all__ = [
     "PendleYieldClient",
@@ -30,5 +31,6 @@ __all__ = [
     "APIError",
     "ValidationError",
     "RateLimitError",
+    "EpochMarketFee",
     "__version__",
 ]

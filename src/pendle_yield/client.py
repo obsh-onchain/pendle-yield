@@ -23,6 +23,7 @@ from .etherscan import EtherscanClient
 from .exceptions import APIError, ValidationError
 from .models import (
     EnrichedVoteEvent,
+    EpochMarketFee,
     MarketFeeData,
     MarketFeesResponse,
     MarketFeeValue,
@@ -232,6 +233,59 @@ class PendleYieldClient:
             ValidationError: If the response format is invalid
         """
         return self._get_market_fees_chart(timestamp_start, timestamp_end)
+
+    def get_market_fees_by_epoch(self, epoch: PendleEpoch) -> list[EpochMarketFee]:
+        """
+        Get market fees for a specific Pendle epoch.
+
+        This method fetches market fee data from the Pendle V2 API for the epoch period
+        and aggregates the total fees per market.
+
+        Args:
+            epoch: PendleEpoch object representing the period
+
+        Returns:
+            List of EpochMarketFee objects containing fee data per market
+
+        Raises:
+            ValidationError: If epoch is invalid
+            APIError: If the API request fails
+        """
+        # Format timestamps for API request (ISO format)
+        timestamp_start = epoch.start_datetime.isoformat()
+        timestamp_end = epoch.end_datetime.isoformat()
+
+        # Fetch market fees data from Pendle V2 API
+        market_fees_response = self._get_market_fees_chart(
+            timestamp_start, timestamp_end
+        )
+
+        # Process each market's fee data
+        epoch_market_fees = []
+        for market_data in market_fees_response.results:
+            # Parse market ID to get chain_id and address
+            try:
+                chain_id, market_address = EpochMarketFee.parse_market_id(
+                    market_data.market.id
+                )
+            except ValueError:
+                # Skip markets with invalid IDs
+                continue
+
+            # Sum up all fees in the epoch period
+            total_fee = sum(value.total_fees for value in market_data.values)
+
+            # Create EpochMarketFee object
+            epoch_market_fee = EpochMarketFee(
+                chain_id=chain_id,
+                market_address=market_address,
+                total_fee=total_fee,
+                epoch_start=epoch.start_datetime,
+                epoch_end=epoch.end_datetime,
+            )
+            epoch_market_fees.append(epoch_market_fee)
+
+        return epoch_market_fees
 
     def _get_pool_voter_apr_data(self) -> VoterAprResponse:
         """

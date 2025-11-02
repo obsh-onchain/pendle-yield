@@ -143,6 +143,7 @@ class TestPendleYieldClient:
                 assert vote.protocol == "Test Protocol"
                 assert vote.voter_apy == 0.055
 
+
 class TestValidationEdgeCases:
     """Test edge cases for validation."""
 

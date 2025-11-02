@@ -281,7 +281,9 @@ class TestCachedEtherscanClient:
         ]
 
         with (
-            patch.object(client._client, "get_vote_events", return_value=mock_events) as mock_get,
+            patch.object(
+                client._client, "get_vote_events", return_value=mock_events
+            ) as mock_get,
             patch.object(client, "_get_latest_block_number", return_value=50000),
         ):
             events = client.get_vote_events(12345, 12345)
@@ -380,7 +382,9 @@ class TestCachedEtherscanClient:
         ]
 
         with (
-            patch.object(client._client, "get_vote_events", return_value=new_events) as mock_get,
+            patch.object(
+                client._client, "get_vote_events", return_value=new_events
+            ) as mock_get,
             patch.object(client, "_get_latest_block_number", return_value=50000),
         ):
             events = client.get_vote_events(100, 105)
@@ -455,7 +459,11 @@ class TestCachedEtherscanClient:
         ]
 
         with (
-            patch.object(client._client, "get_vote_events", side_effect=[gap1_events, gap2_events]) as mock_get,
+            patch.object(
+                client._client,
+                "get_vote_events",
+                side_effect=[gap1_events, gap2_events],
+            ) as mock_get,
             patch.object(client, "_get_latest_block_number", return_value=50000),
         ):
             events = client.get_vote_events(100, 104)
@@ -484,7 +492,9 @@ class TestCachedEtherscanClient:
         ]
 
         with (
-            patch.object(client._client, "get_vote_events", return_value=mock_events) as mock_get,
+            patch.object(
+                client._client, "get_vote_events", return_value=mock_events
+            ) as mock_get,
             patch.object(client, "_get_latest_block_number", return_value=50000),
         ):
             client.get_vote_events(12345, 12345, max_pages=5)
@@ -617,9 +627,7 @@ class TestCachedEtherscanClient:
         latest_block = 1000
 
         with (
-            patch.object(
-                client, "_get_latest_block_number", return_value=latest_block
-            ),
+            patch.object(client, "_get_latest_block_number", return_value=latest_block),
             patch.object(client._client, "get_vote_events", return_value=[]),
         ):
             # Request blocks that extend into the future
@@ -640,9 +648,7 @@ class TestCachedEtherscanClient:
         latest_block = 1000
 
         with (
-            patch.object(
-                client, "_get_latest_block_number", return_value=latest_block
-            ),
+            patch.object(client, "_get_latest_block_number", return_value=latest_block),
             patch.object(client._client, "get_vote_events", return_value=[]),
         ):
             # Request only future blocks
@@ -658,9 +664,7 @@ class TestCachedEtherscanClient:
         latest_block = 1000
 
         with (
-            patch.object(
-                client, "_get_latest_block_number", return_value=latest_block
-            ),
+            patch.object(client, "_get_latest_block_number", return_value=latest_block),
             patch.object(client._client, "get_vote_events", return_value=[]),
         ):
             # Request blocks up to and including the latest block
