@@ -11,6 +11,7 @@ __author__ = "obsh-onchain"
 
 # Import main classes for easy access
 from .client import PendleYieldClient
+from .client_cached import CachedPendleYieldClient
 from .epoch import PendleEpoch
 from .etherscan import EtherscanClient
 from .etherscan_cached import CachedEtherscanClient
@@ -24,6 +25,7 @@ from .models import EpochMarketFee
 
 __all__ = [
     "PendleYieldClient",
+    "CachedPendleYieldClient",
     "PendleEpoch",
     "EtherscanClient",
     "CachedEtherscanClient",
