@@ -410,6 +410,27 @@ class CachedEtherscanClient:
         """Context manager exit."""
         self.close()
 
+    def get_block_number_by_timestamp(
+        self, timestamp: int, closest: str = "before"
+    ) -> int:
+        """
+        Get block number by timestamp using Etherscan API.
+
+        Delegates to the underlying EtherscanClient.
+
+        Args:
+            timestamp: Unix timestamp to find the block for
+            closest: Direction to search - "before" or "after" the timestamp
+
+        Returns:
+            Block number as integer
+
+        Raises:
+            ValidationError: If timestamp or closest parameter is invalid
+            APIError: If the API request fails
+        """
+        return self._client.get_block_number_by_timestamp(timestamp, closest)
+
     def close(self) -> None:
         """Close the underlying HTTP client."""
         self._client.close()
