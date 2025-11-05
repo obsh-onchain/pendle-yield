@@ -5,6 +5,7 @@ This module contains the PendleYieldClient class, which provides the primary
 interface for interacting with Pendle Finance data.
 """
 
+import time
 from datetime import datetime
 from datetime import datetime as dt
 from typing import Any
@@ -72,6 +73,12 @@ class PendleYieldClient:
         self.timeout = timeout
         self.max_retries = max_retries
 
+        # Rate limiting for Pendle API based on Computing Units (CU)
+        # Pendle API limit: 100 CU per minute
+        self._pendle_cu_limit = 100.0  # CU per minute
+        self._pendle_cu_window = 60.0  # 1 minute window in seconds
+        self._pendle_cu_consumed: list[tuple[float, float]] = []  # (timestamp, cu_cost)
+
         # Initialize composed clients
         self._etherscan_client = EtherscanClient(
             api_key=etherscan_api_key,
@@ -96,6 +103,57 @@ class PendleYieldClient:
         """Close the HTTP clients."""
         self._etherscan_client.close()
         self._pendle_v2_client.get_httpx_client().close()
+
+    def _enforce_pendle_rate_limit(self, cu_cost: float) -> None:
+        """
+        Enforce rate limiting for Pendle API based on Computing Units (CU).
+
+        Pendle API has a limit of 100 CU per minute. This method ensures we don't
+        exceed this limit by tracking CU consumption and sleeping if necessary.
+
+        Args:
+            cu_cost: The CU cost of the API call to be made
+        """
+        current_time = time.time()
+
+        # Remove entries older than the rate limit window (1 minute)
+        self._pendle_cu_consumed = [
+            (timestamp, cu)
+            for timestamp, cu in self._pendle_cu_consumed
+            if current_time - timestamp < self._pendle_cu_window
+        ]
+
+        # Calculate current CU usage in the window
+        current_cu_usage = sum(cu for _, cu in self._pendle_cu_consumed)
+
+        # If adding this request would exceed the limit, sleep until we have capacity
+        if current_cu_usage + cu_cost > self._pendle_cu_limit:
+            # Find the oldest request that needs to age out to make room
+            needed_cu = cu_cost - (self._pendle_cu_limit - current_cu_usage)
+            cu_accumulated = 0.0
+            sleep_until_time = current_time
+
+            for timestamp, cu in self._pendle_cu_consumed:
+                cu_accumulated += cu
+                if cu_accumulated >= needed_cu:
+                    # We need to wait until this request ages out
+                    sleep_until_time = timestamp + self._pendle_cu_window
+                    break
+
+            sleep_time = max(0, sleep_until_time - current_time)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+                current_time = time.time()
+
+                # Clean up again after sleeping
+                self._pendle_cu_consumed = [
+                    (timestamp, cu)
+                    for timestamp, cu in self._pendle_cu_consumed
+                    if current_time - timestamp < self._pendle_cu_window
+                ]
+
+        # Record this request
+        self._pendle_cu_consumed.append((current_time, cu_cost))
 
     def get_vote_events(self, from_block: int, to_block: int) -> list[VoteEvent]:
         """
@@ -291,12 +349,17 @@ class PendleYieldClient:
         """
         Fetch pool voter APR data from the Pendle V2 API.
 
+        This endpoint costs 3 CU (Computing Units).
+
         Returns:
             Voter APR response containing pool data with APR metrics
 
         Raises:
             APIError: If the API request fails
         """
+        # Enforce rate limiting before making Pendle API request (3 CU)
+        self._enforce_pendle_rate_limit(cu_cost=3.0)
+
         try:
             response = ve_pendle_controller_get_pool_voter_apr_and_swap_fee.sync(
                 client=self._pendle_v2_client,
@@ -369,6 +432,8 @@ class PendleYieldClient:
         """
         Fetch market fees chart data from the Pendle V2 API.
 
+        This endpoint costs 8 CU (Computing Units).
+
         Args:
             timestamp_start: Start timestamp in ISO format (e.g., "2025-07-30")
             timestamp_end: End timestamp in ISO format (e.g., "2025-09-01")
@@ -379,6 +444,9 @@ class PendleYieldClient:
         Raises:
             APIError: If the API request fails
         """
+        # Enforce rate limiting before making Pendle API request (8 CU)
+        self._enforce_pendle_rate_limit(cu_cost=8.0)
+
         try:
             # Parse ISO format timestamps to datetime objects
             start_dt = dt.fromisoformat(timestamp_start)
