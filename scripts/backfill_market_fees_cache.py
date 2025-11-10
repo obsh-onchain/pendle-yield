@@ -9,7 +9,7 @@ Finished epochs will be cached permanently in the database.
 import os
 from datetime import UTC, datetime, timedelta
 
-from pendle_yield import CachedPendleYieldClient, PendleEpoch
+from pendle_yield import PendleYieldClient, PendleEpoch
 
 
 def main() -> None:
@@ -31,8 +31,8 @@ def main() -> None:
     print(f"Database:   cache.db")
     print("=" * 80)
 
-    # Initialize the cached client
-    with CachedPendleYieldClient(
+    # Initialize the client with caching enabled
+    with PendleYieldClient(
         etherscan_api_key=etherscan_api_key, db_path="cache.db"
     ) as client:
         # Calculate total epochs to process

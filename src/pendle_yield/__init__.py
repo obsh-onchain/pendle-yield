@@ -11,7 +11,6 @@ __author__ = "obsh-onchain"
 
 # Import main classes for easy access
 from .client import PendleYieldClient
-from .client_cached import CachedPendleYieldClient
 from .epoch import PendleEpoch
 from .etherscan import EtherscanClient
 from .etherscan_cached import CachedEtherscanClient
@@ -21,11 +20,10 @@ from .exceptions import (
     RateLimitError,
     ValidationError,
 )
-from .models import EpochMarketFee
+from .models import EpochMarketFee, EpochVotesSnapshot, VoteSnapshot
 
 __all__ = [
     "PendleYieldClient",
-    "CachedPendleYieldClient",
     "PendleEpoch",
     "EtherscanClient",
     "CachedEtherscanClient",
@@ -34,5 +32,7 @@ __all__ = [
     "ValidationError",
     "RateLimitError",
     "EpochMarketFee",
+    "VoteSnapshot",
+    "EpochVotesSnapshot",
     "__version__",
 ]

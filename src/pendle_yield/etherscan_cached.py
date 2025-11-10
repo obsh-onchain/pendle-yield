@@ -396,9 +396,7 @@ class CachedEtherscanClient:
 
         # Get the block number for current timestamp
         # Using "before" to ensure we get a confirmed block
-        latest_block = self._client.get_block_number_by_timestamp(
-            current_timestamp, "before"
-        )
+        latest_block = self.get_block_number_by_timestamp(current_timestamp, "before")
 
         return latest_block
 
@@ -429,6 +427,7 @@ class CachedEtherscanClient:
             ValidationError: If timestamp or closest parameter is invalid
             APIError: If the API request fails
         """
+        # @TODO implement caching id SQLite db
         return self._client.get_block_number_by_timestamp(timestamp, closest)
 
     def close(self) -> None:

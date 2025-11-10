@@ -18,8 +18,11 @@ pip install pendle-yield
 ```python
 from pendle_yield import PendleEpoch, PendleYieldClient
 
-# Initialize with your Etherscan API key
-client = PendleYieldClient(etherscan_api_key="your_api_key_here")
+# Initialize with your Etherscan API key and optional caching
+client = PendleYieldClient(
+    etherscan_api_key="your_api_key_here",
+    db_path="cache.db"  # Optional: enables caching for better performance
+)
 
 # Create epoch object, epoch starts on Th 00:00:00 and ends on Wd 23:59:59
 epoch = PendleEpoch("2025-08-21")
@@ -37,7 +40,31 @@ for vote in votes:
     print(f"VePendle Value: {vote.ve_pendle_value:.4f}")
 ```
 
-## What it does now
+### Caching
+
+The client supports optional SQLite caching to avoid redundant API calls:
+
+```python
+# With caching (recommended for production)
+client = PendleYieldClient(
+    etherscan_api_key="your_key",
+    db_path="cache.db"  # Caches market fees and vote snapshots
+)
+
+# Without caching (always fetches fresh data)
+client = PendleYieldClient(
+    etherscan_api_key="your_key"
+)
+```
+
+**Caching behavior:**
+- **Vote events**: Cached per block range (automatically uses `CachedEtherscanClient`)
+- **Market fees**: Cached permanently for past epochs (immutable data)
+- **Vote snapshots**: Cached for past and current epochs (snapshot is at epoch start)
+
+## Features
+
+### Vote Events by Epoch
 
 The `get_votes_by_epoch()` method:
 1. Fetches vote events from Etherscan for the specified Pendle epoch
@@ -49,6 +76,43 @@ Each vote event includes:
 - Pool information (name, address, protocol, expiry, current voter APY)
 - Vote parameters (bias, slope)
 - **VePendle value**: Calculated voting power at the time of the vote using the formula `VePendle = max(0, (bias - slope × timestamp) / 10^18)`
+
+### Epoch Votes Snapshot
+
+The `get_epoch_votes_snapshot()` method provides the state of all active votes at the **start** of an epoch (Thursday 00:00 UTC):
+
+```python
+from pendle_yield import PendleEpoch, PendleYieldClient
+
+# Initialize client with caching for better performance
+client = PendleYieldClient(
+    etherscan_api_key="your_api_key_here",
+    db_path="data/cache.db"
+)
+
+# Get current epoch
+epoch = PendleEpoch()
+
+# Get snapshot at epoch start
+snapshot = client.get_epoch_votes_snapshot(epoch)
+
+print(f"Total Active Votes: {len(snapshot.votes)}")
+print(f"Total vePendle: {snapshot.total_ve_pendle:,.2f}")
+
+# Analyze individual votes
+for vote in snapshot.votes:
+    print(f"Voter: {vote.voter_address}")
+    print(f"Pool: {vote.pool_address}")
+    print(f"vePendle: {vote.ve_pendle_value:,.2f}")
+```
+
+**Key concepts:**
+- Snapshots are taken at epoch start (Thursday 00:00 UTC) when incentive rates are adjusted
+- Votes cast **during** an epoch affect the **next** epoch's snapshot
+- VePendle values decay over time based on bias and slope
+- Expired votes (vePendle ≤ 0) are automatically filtered out
+- Votes persist across epochs unless explicitly removed (weight = 0)
+- Snapshots are cached in SQLite for instant retrieval
 
 ## Requirements
 

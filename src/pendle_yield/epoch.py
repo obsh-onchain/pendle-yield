@@ -6,12 +6,13 @@ that start on Thursday 00:00 UTC.
 """
 
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from .exceptions import ValidationError
 
 if TYPE_CHECKING:
     from .etherscan import EtherscanClient
+    from .etherscan_cached import CachedEtherscanClient
 
 
 class PendleEpoch:
@@ -184,13 +185,15 @@ class PendleEpoch:
         return self._start_datetime <= check_time < self._end_datetime
 
     def get_block_range(
-        self, etherscan_client: "EtherscanClient", use_latest_for_current: bool = False
+        self,
+        etherscan_client: Union["EtherscanClient", "CachedEtherscanClient"],
+        use_latest_for_current: bool = False,
     ) -> tuple[int, int | None]:
         """
         Get the block number range for this epoch using Etherscan.
 
         Args:
-            etherscan_client: EtherscanClient instance to use for block lookups
+            etherscan_client: EtherscanClient or CachedEtherscanClient instance to use for block lookups
             use_latest_for_current: If True, use the latest block number for current epochs.
                                   If False, return None for the end block of current epochs.
 

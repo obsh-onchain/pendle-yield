@@ -5,9 +5,11 @@ This module contains the PendleYieldClient class, which provides the primary
 interface for interacting with Pendle Finance data.
 """
 
+import sqlite3
 import time
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from datetime import datetime as dt
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -21,10 +23,12 @@ from pendle_v2.types import UNSET
 
 from .epoch import PendleEpoch
 from .etherscan import EtherscanClient
+from .etherscan_cached import CachedEtherscanClient
 from .exceptions import APIError, ValidationError
 from .models import (
     EnrichedVoteEvent,
     EpochMarketFee,
+    EpochVotesSnapshot,
     MarketFeeData,
     MarketFeesResponse,
     MarketFeeValue,
@@ -33,7 +37,11 @@ from .models import (
     PoolVoterData,
     VoteEvent,
     VoterAprResponse,
+    VoteSnapshot,
 )
+
+# First epoch when Pendle voting started (2022-11-23 00:00 UTC)
+FIRST_EPOCH_START = datetime(2022, 11, 23, 0, 0, 0, tzinfo=UTC)
 
 
 class PendleYieldClient:
@@ -42,11 +50,18 @@ class PendleYieldClient:
 
     This client provides methods to fetch vote events from Etherscan,
     pool information from Pendle voter APR API, and combine them into enriched datasets.
+
+    Caching is enabled when db_path is provided, storing data in SQLite
+    to avoid redundant API calls. When caching is enabled:
+    - Vote events are cached per block range (via CachedEtherscanClient)
+    - Market fees are cached for past epochs
+    - Vote snapshots are cached for past and current epochs
     """
 
     def __init__(
         self,
         etherscan_api_key: str,
+        db_path: str | None = None,
         etherscan_base_url: str = "https://api.etherscan.io/v2/api",
         pendle_base_url: str = "https://api-v2.pendle.finance/core",
         timeout: float = 30.0,
@@ -57,6 +72,12 @@ class PendleYieldClient:
 
         Args:
             etherscan_api_key: API key for Etherscan
+            db_path: Optional path to SQLite database file for caching.
+                    If provided, enables caching for:
+                    - Vote events (per block range)
+                    - Market fees (past epochs)
+                    - Vote snapshots (past and current epochs)
+                    If None, all data is fetched fresh from APIs.
             etherscan_base_url: Base URL for Etherscan API
             pendle_base_url: Base URL for Pendle API
             timeout: Request timeout in seconds
@@ -73,6 +94,17 @@ class PendleYieldClient:
         self.timeout = timeout
         self.max_retries = max_retries
 
+        # Caching configuration
+        self.db_path = Path(db_path) if db_path else None
+        self._caching_enabled = db_path is not None
+
+        # Initialize database if caching is enabled
+        if self._caching_enabled:
+            # Create parent directory if it doesn't exist
+            assert self.db_path is not None  # Type narrowing for mypy
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self._init_database()
+
         # Rate limiting for Pendle API based on Computing Units (CU)
         # Pendle API limit: 100 CU per minute
         self._pendle_cu_limit = 100.0  # CU per minute
@@ -80,16 +112,98 @@ class PendleYieldClient:
         self._pendle_cu_consumed: list[tuple[float, float]] = []  # (timestamp, cu_cost)
 
         # Initialize composed clients
-        self._etherscan_client = EtherscanClient(
-            api_key=etherscan_api_key,
-            base_url=etherscan_base_url,
-            timeout=timeout,
-            max_retries=max_retries,
-        )
+        # Use CachedEtherscanClient if caching is enabled, otherwise use regular client
+        if self._caching_enabled:
+            assert self.db_path is not None  # Type narrowing for mypy
+            self._etherscan_client: EtherscanClient | CachedEtherscanClient = (
+                CachedEtherscanClient(
+                    api_key=etherscan_api_key,
+                    db_path=str(self.db_path),
+                    base_url=etherscan_base_url,
+                    timeout=timeout,
+                    max_retries=max_retries,
+                )
+            )
+        else:
+            self._etherscan_client = EtherscanClient(
+                api_key=etherscan_api_key,
+                base_url=etherscan_base_url,
+                timeout=timeout,
+                max_retries=max_retries,
+            )
+
         self._pendle_v2_client = PendleV2Client(
             base_url=pendle_base_url,
             timeout=httpx.Timeout(timeout),
         )
+
+    def _init_database(self) -> None:
+        """
+        Initialize the SQLite database with required tables and indices.
+
+        Creates tables for caching market fees and vote snapshots.
+        Only called when caching is enabled (db_path is provided).
+        """
+        if not self._caching_enabled:
+            return
+
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            cursor = conn.cursor()
+
+            # Create epoch_market_fees table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS epoch_market_fees (
+                    epoch_start INTEGER NOT NULL,
+                    epoch_end INTEGER NOT NULL,
+                    chain_id INTEGER NOT NULL,
+                    market_address TEXT NOT NULL,
+                    total_fee REAL NOT NULL,
+                    cached_at INTEGER NOT NULL,
+                    PRIMARY KEY (epoch_start, epoch_end, chain_id, market_address)
+                )
+                """
+            )
+
+            # Create index for efficient epoch lookups
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_epoch_range
+                ON epoch_market_fees(epoch_start, epoch_end)
+                """
+            )
+
+            # Create epoch_votes_snapshots table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS epoch_votes_snapshots (
+                    epoch_start INTEGER NOT NULL,
+                    epoch_end INTEGER NOT NULL,
+                    voter_address TEXT NOT NULL,
+                    pool_address TEXT NOT NULL,
+                    bias TEXT NOT NULL,
+                    slope TEXT NOT NULL,
+                    ve_pendle_value REAL NOT NULL,
+                    last_vote_block INTEGER NOT NULL,
+                    last_vote_timestamp INTEGER NOT NULL,
+                    cached_at INTEGER NOT NULL,
+                    PRIMARY KEY (epoch_start, epoch_end, voter_address, pool_address)
+                )
+                """
+            )
+
+            # Create index for efficient snapshot epoch lookups
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_snapshot_epoch
+                ON epoch_votes_snapshots(epoch_start, epoch_end)
+                """
+            )
+
+            conn.commit()
+        finally:
+            conn.close()
 
     def __enter__(self) -> "PendleYieldClient":
         """Context manager entry."""
@@ -273,6 +387,135 @@ class PendleYieldClient:
         # Delegate to existing get_votes method
         return self.get_votes(from_block, to_block)
 
+    def _get_cached_epoch_fees(self, epoch: PendleEpoch) -> list[EpochMarketFee] | None:
+        """
+        Retrieve cached market fees for a specific epoch.
+
+        Args:
+            epoch: PendleEpoch object
+
+        Returns:
+            List of cached EpochMarketFee objects, or None if not cached or caching disabled
+        """
+        if not self._caching_enabled:
+            return None
+
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            cursor = conn.cursor()
+
+            # Convert epoch timestamps to integers for comparison
+            epoch_start = epoch.start_timestamp
+            epoch_end = epoch.end_timestamp
+
+            cursor.execute(
+                """
+                SELECT chain_id, market_address, total_fee, epoch_start, epoch_end
+                FROM epoch_market_fees
+                WHERE epoch_start = ? AND epoch_end = ?
+                ORDER BY chain_id, market_address
+                """,
+                (epoch_start, epoch_end),
+            )
+
+            rows = cursor.fetchall()
+
+            # If no rows found, cache miss
+            if not rows:
+                return None
+
+            # Convert rows to EpochMarketFee objects
+            epoch_fees = []
+            for row in rows:
+                epoch_fee = EpochMarketFee(
+                    chain_id=row[0],
+                    market_address=row[1],
+                    total_fee=row[2],
+                    epoch_start=datetime.fromtimestamp(row[3]),
+                    epoch_end=datetime.fromtimestamp(row[4]),
+                )
+                epoch_fees.append(epoch_fee)
+
+            return epoch_fees
+        finally:
+            conn.close()
+
+    def _store_epoch_fees(
+        self, epoch: PendleEpoch, epoch_fees: list[EpochMarketFee]
+    ) -> None:
+        """
+        Store epoch market fees in the database.
+
+        Args:
+            epoch: PendleEpoch object
+            epoch_fees: List of EpochMarketFee objects to store
+        """
+        if not self._caching_enabled:
+            return
+
+        if not epoch_fees:
+            # Still store an empty marker to indicate this epoch was fetched
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                cursor = conn.cursor()
+                cached_at = int(datetime.now().timestamp())
+
+                # Insert a marker row with a special market_address
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO epoch_market_fees
+                    (epoch_start, epoch_end, chain_id, market_address, total_fee, cached_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        epoch.start_timestamp,
+                        epoch.end_timestamp,
+                        0,  # chain_id 0 as marker
+                        "0x0000000000000000000000000000000000000000",  # zero address
+                        0.0,
+                        cached_at,
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+            return
+
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            cursor = conn.cursor()
+
+            # Get current timestamp for cache metadata
+            cached_at = int(datetime.now().timestamp())
+
+            # Prepare data for bulk insert
+            rows = []
+            for fee in epoch_fees:
+                rows.append(
+                    (
+                        epoch.start_timestamp,
+                        epoch.end_timestamp,
+                        fee.chain_id,
+                        fee.market_address,
+                        fee.total_fee,
+                        cached_at,
+                    )
+                )
+
+            # Use INSERT OR REPLACE to handle updates gracefully
+            cursor.executemany(
+                """
+                INSERT OR REPLACE INTO epoch_market_fees
+                (epoch_start, epoch_end, chain_id, market_address, total_fee, cached_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
+
+            conn.commit()
+        finally:
+            conn.close()
+
     def get_market_fees_for_period(
         self, timestamp_start: str, timestamp_end: str
     ) -> MarketFeesResponse:
@@ -297,7 +540,8 @@ class PendleYieldClient:
         Get market fees for a specific Pendle epoch.
 
         This method fetches market fee data from the Pendle V2 API for the epoch period
-        and aggregates the total fees per market.
+        and aggregates the total fees per market. If caching is enabled, finished epochs
+        are cached permanently.
 
         Args:
             epoch: PendleEpoch object representing the period
@@ -306,9 +550,30 @@ class PendleYieldClient:
             List of EpochMarketFee objects containing fee data per market
 
         Raises:
-            ValidationError: If epoch is invalid
+            ValidationError: If epoch is invalid or future
             APIError: If the API request fails
         """
+        # Validate epoch - don't allow future epochs
+        if epoch.is_future:
+            raise ValidationError(
+                "Cannot get market fees for future epoch",
+                field="epoch_status",
+                value="future",
+            )
+
+        # Try to get from cache first (if caching is enabled and epoch is past)
+        if self._caching_enabled and epoch.is_past:
+            cached_fees = self._get_cached_epoch_fees(epoch)
+            if cached_fees is not None:
+                # Filter out the marker row if present
+                return [
+                    fee
+                    for fee in cached_fees
+                    if fee.market_address
+                    != "0x0000000000000000000000000000000000000000"
+                ]
+
+        # Cache miss or current epoch - fetch from API
         # Format timestamps for API request (ISO format)
         timestamp_start = epoch.start_datetime.isoformat()
         timestamp_end = epoch.end_datetime.isoformat()
@@ -342,6 +607,10 @@ class PendleYieldClient:
                 epoch_end=epoch.end_datetime,
             )
             epoch_market_fees.append(epoch_market_fee)
+
+        # Cache if this is a finished epoch
+        if self._caching_enabled and epoch.is_past:
+            self._store_epoch_fees(epoch, epoch_market_fees)
 
         return epoch_market_fees
 
@@ -483,3 +752,291 @@ class PendleYieldClient:
             return MarketFeesResponse(results=market_fee_data_list)
         except Exception as e:
             raise APIError(f"Failed to fetch market fees data: {str(e)}") from e
+
+    def _get_cached_votes_snapshot(
+        self, epoch: PendleEpoch
+    ) -> EpochVotesSnapshot | None:
+        """
+        Retrieve cached votes snapshot for a specific epoch.
+
+        Args:
+            epoch: PendleEpoch object
+
+        Returns:
+            EpochVotesSnapshot object, or None if not cached or caching disabled
+        """
+        if not self._caching_enabled:
+            return None
+
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            cursor = conn.cursor()
+
+            # Convert epoch timestamps to integers for comparison
+            epoch_start = epoch.start_timestamp
+            epoch_end = epoch.end_timestamp
+
+            cursor.execute(
+                """
+                SELECT voter_address, pool_address, bias, slope, ve_pendle_value,
+                       last_vote_block, last_vote_timestamp
+                FROM epoch_votes_snapshots
+                WHERE epoch_start = ? AND epoch_end = ?
+                ORDER BY voter_address, pool_address
+                """,
+                (epoch_start, epoch_end),
+            )
+
+            rows = cursor.fetchall()
+
+            # If no rows found, cache miss
+            if not rows:
+                return None
+
+            # Convert rows to VoteSnapshot objects
+            votes = []
+            for row in rows:
+                # Skip marker row for empty snapshots
+                if row[0] == "0x0000000000000000000000000000000000000000":
+                    continue
+
+                vote = VoteSnapshot(
+                    voter_address=row[0],
+                    pool_address=row[1],
+                    bias=int(row[2]),  # Convert from TEXT to int
+                    slope=int(row[3]),  # Convert from TEXT to int
+                    ve_pendle_value=row[4],
+                    last_vote_block=row[5],
+                    last_vote_timestamp=datetime.fromtimestamp(row[6]),
+                )
+                votes.append(vote)
+
+            # Calculate total vePendle
+            total_ve_pendle = sum(v.ve_pendle_value for v in votes)
+
+            # Create and return snapshot
+            return EpochVotesSnapshot(
+                epoch_start=epoch.start_datetime,
+                epoch_end=epoch.end_datetime,
+                snapshot_timestamp=epoch.start_datetime,
+                votes=votes,
+                total_ve_pendle=total_ve_pendle,
+            )
+        finally:
+            conn.close()
+
+    def _store_votes_snapshot(
+        self, epoch: PendleEpoch, snapshot: EpochVotesSnapshot
+    ) -> None:
+        """
+        Store epoch votes snapshot in the database.
+
+        Args:
+            epoch: PendleEpoch object
+            snapshot: EpochVotesSnapshot object to store
+        """
+        if not self._caching_enabled:
+            return
+
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            cursor = conn.cursor()
+
+            # Get current timestamp for cache metadata
+            cached_at = int(datetime.now().timestamp())
+
+            # Delete existing entries for this epoch first
+            cursor.execute(
+                """
+                DELETE FROM epoch_votes_snapshots
+                WHERE epoch_start = ? AND epoch_end = ?
+                """,
+                (epoch.start_timestamp, epoch.end_timestamp),
+            )
+
+            # If snapshot is empty, insert a marker to indicate it was cached
+            if not snapshot.votes:
+                cursor.execute(
+                    """
+                    INSERT INTO epoch_votes_snapshots
+                    (epoch_start, epoch_end, voter_address, pool_address, bias, slope,
+                     ve_pendle_value, last_vote_block, last_vote_timestamp, cached_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        epoch.start_timestamp,
+                        epoch.end_timestamp,
+                        "0x0000000000000000000000000000000000000000",  # marker
+                        "0x0000000000000000000000000000000000000000",  # marker
+                        "0",
+                        "0",
+                        0.0,
+                        0,
+                        epoch.start_timestamp,
+                        cached_at,
+                    ),
+                )
+            else:
+                # Prepare data for bulk insert
+                rows = []
+                for vote in snapshot.votes:
+                    rows.append(
+                        (
+                            epoch.start_timestamp,
+                            epoch.end_timestamp,
+                            vote.voter_address,
+                            vote.pool_address,
+                            str(vote.bias),  # Convert to TEXT
+                            str(vote.slope),  # Convert to TEXT
+                            vote.ve_pendle_value,
+                            vote.last_vote_block,
+                            int(vote.last_vote_timestamp.timestamp()),
+                            cached_at,
+                        )
+                    )
+
+                # Insert new snapshot data
+                cursor.executemany(
+                    """
+                    INSERT INTO epoch_votes_snapshots
+                    (epoch_start, epoch_end, voter_address, pool_address, bias, slope,
+                     ve_pendle_value, last_vote_block, last_vote_timestamp, cached_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    rows,
+                )
+
+            conn.commit()
+        finally:
+            conn.close()
+
+    def get_epoch_votes_snapshot(self, epoch: PendleEpoch) -> EpochVotesSnapshot:
+        """
+        Get the votes snapshot at the START of the epoch.
+
+        A snapshot represents the state of all active votes at Thursday 00:00 UTC
+        when the epoch begins. This is when incentive rates are adjusted.
+
+        Important: The snapshot is calculated at epoch start. Votes cast DURING
+        this epoch do NOT affect this epoch's snapshot - they affect the NEXT
+        epoch's snapshot.
+
+        If caching is enabled, snapshots are cached permanently for both past and
+        current epochs (since the snapshot is always at epoch start, which is in the past).
+
+        Args:
+            epoch: PendleEpoch object representing the period
+
+        Returns:
+            EpochVotesSnapshot with all active votes and their vePendle values
+            at the epoch start time
+
+        Raises:
+            ValidationError: If epoch is future (snapshot time hasn't occurred yet)
+            APIError: If any API request fails
+        """
+        # Validate - cannot get snapshot for future epochs
+        if epoch.is_future:
+            raise ValidationError(
+                "Cannot get votes snapshot for future epoch - snapshot time hasn't occurred yet",
+                field="epoch_status",
+                value="future",
+            )
+
+        # Try to get from cache first (if caching is enabled)
+        # Both past and current epochs can be cached since snapshot is at epoch start
+        if self._caching_enabled:
+            cached_snapshot = self._get_cached_votes_snapshot(epoch)
+            if cached_snapshot is not None:
+                return cached_snapshot
+
+        # Cache miss - build snapshot from scratch
+        # Strategy: Build snapshot from previous epoch's snapshot + previous epoch's votes
+        # This is more efficient than processing all historical votes
+
+        # Get the previous epoch
+        previous_epoch_start = epoch.start_datetime - timedelta(days=7)
+        previous_epoch = PendleEpoch(previous_epoch_start)
+
+        # Base case: If this is before the first epoch, start with empty state
+        vote_state: dict[tuple[str, str], VoteSnapshot]
+        if previous_epoch.start_datetime < FIRST_EPOCH_START:
+            vote_state = {}
+        else:
+            # Recursive case: Get previous epoch's snapshot
+            previous_snapshot = self.get_epoch_votes_snapshot(previous_epoch)
+
+            # Start with previous snapshot's vote state
+            vote_state = {
+                (vote.voter_address, vote.pool_address): VoteSnapshot(
+                    voter_address=vote.voter_address,
+                    pool_address=vote.pool_address,
+                    bias=vote.bias,
+                    slope=vote.slope,
+                    ve_pendle_value=0.0,  # Will recalculate for new snapshot time
+                    last_vote_block=vote.last_vote_block,
+                    last_vote_timestamp=vote.last_vote_timestamp,
+                )
+                for vote in previous_snapshot.votes
+            }
+
+        # Get all votes from the PREVIOUS epoch (not current epoch)
+        # These votes affect the current epoch's snapshot
+        try:
+            previous_epoch_votes = self.get_votes_by_epoch(previous_epoch)
+        except ValidationError:
+            # If previous epoch is before first epoch, no votes exist
+            previous_epoch_votes = []
+
+        # Apply votes chronologically to update state
+        for vote in sorted(previous_epoch_votes, key=lambda v: v.block_number):
+            key = (vote.voter_address, vote.pool_address)
+
+            if vote.weight == 0:
+                # Remove vote for this pool
+                vote_state.pop(key, None)
+            else:
+                # Add or update vote
+                vote_state[key] = VoteSnapshot(
+                    voter_address=vote.voter_address,
+                    pool_address=vote.pool_address,
+                    bias=vote.bias,
+                    slope=vote.slope,
+                    ve_pendle_value=0.0,  # Will calculate below
+                    last_vote_block=vote.block_number,
+                    last_vote_timestamp=vote.timestamp or epoch.start_datetime,
+                )
+
+        # Calculate vePendle values at the snapshot time (epoch start)
+        snapshot_timestamp = epoch.start_timestamp
+        active_votes: list[VoteSnapshot] = []
+
+        vote_snapshot: VoteSnapshot
+        for vote_snapshot in vote_state.values():
+            # Calculate vePendle at snapshot time
+            # Formula: (bias - slope × timestamp) / 10^18
+            ve_value_wei = vote_snapshot.bias - vote_snapshot.slope * snapshot_timestamp
+
+            # Convert from wei to readable units
+            ve_value = float(ve_value_wei) / 10**18
+
+            # Only include votes with positive vePendle value
+            if ve_value > 0:
+                # Update the vote with calculated vePendle value
+                vote_snapshot.ve_pendle_value = ve_value
+                active_votes.append(vote_snapshot)
+
+        # Create snapshot
+        snapshot = EpochVotesSnapshot(
+            epoch_start=epoch.start_datetime,
+            epoch_end=epoch.end_datetime,
+            snapshot_timestamp=epoch.start_datetime,
+            votes=active_votes,
+            total_ve_pendle=sum(v.ve_pendle_value for v in active_votes),
+        )
+
+        # Cache the snapshot (works for both past and current epochs)
+        if self._caching_enabled:
+            self._store_votes_snapshot(epoch, snapshot)
+
+        return snapshot

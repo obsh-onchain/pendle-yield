@@ -1,6 +1,6 @@
 [project]
 name = "pendle-yield"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "Python SDK for interacting with Pendle Finance data"
 authors = [
     {name = "obsh-onchain"},

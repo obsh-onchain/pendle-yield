@@ -337,3 +337,69 @@ class EpochMarketFee(BaseModel):
             address = f"0x{address}"
 
         return chain_id, address
+
+
+class VoteSnapshot(BaseModel):
+    """Represents a single vote in an epoch snapshot."""
+
+    voter_address: str = Field(..., description="Address of the voter")
+    pool_address: str = Field(..., description="Address of the pool being voted for")
+    bias: int = Field(..., description="Vote bias value")
+    slope: int = Field(..., description="Vote slope value")
+    ve_pendle_value: float = Field(
+        ..., description="Calculated VePendle value at snapshot time"
+    )
+    last_vote_block: int = Field(
+        ..., description="Block number of the last vote that affected this state"
+    )
+    last_vote_timestamp: datetime = Field(
+        ..., description="Timestamp of the last vote that affected this state"
+    )
+
+    @field_validator("voter_address", "pool_address")
+    @classmethod
+    def validate_ethereum_address(cls, v: str) -> str:
+        """Validate that the address is a valid Ethereum address format."""
+        if not v.startswith("0x") or len(v) != 42:
+            raise ValueError("Invalid Ethereum address format")
+        return v.lower()
+
+    @field_validator("bias", "slope")
+    @classmethod
+    def validate_non_negative(cls, v: int) -> int:
+        """Validate that bias and slope are non-negative."""
+        if v < 0:
+            raise ValueError("Value must be non-negative")
+        return v
+
+    @field_validator("ve_pendle_value")
+    @classmethod
+    def validate_ve_pendle_non_negative(cls, v: float) -> float:
+        """Validate that VePendle value is non-negative."""
+        if v < 0:
+            raise ValueError("VePendle value must be non-negative")
+        return v
+
+
+class EpochVotesSnapshot(BaseModel):
+    """Represents the complete votes snapshot for an epoch."""
+
+    epoch_start: datetime = Field(..., description="Epoch start timestamp")
+    epoch_end: datetime = Field(..., description="Epoch end timestamp")
+    snapshot_timestamp: datetime = Field(
+        ..., description="Timestamp when snapshot was taken (always epoch start)"
+    )
+    votes: list[VoteSnapshot] = Field(
+        ..., description="List of active votes in the snapshot"
+    )
+    total_ve_pendle: float = Field(
+        ..., description="Sum of all vePendle values in the snapshot"
+    )
+
+    @field_validator("total_ve_pendle")
+    @classmethod
+    def validate_total_ve_pendle_non_negative(cls, v: float) -> float:
+        """Validate that total vePendle is non-negative."""
+        if v < 0:
+            raise ValueError("Total vePendle must be non-negative")
+        return v
