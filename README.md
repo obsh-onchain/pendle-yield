@@ -134,9 +134,29 @@ pdm run pytest
 pdm run python examples/basic_usage.py
 ```
 
-### Pendle API
+### Regenerating the Pendle V2 Client
 
-To update pendle client
+The Pendle V2 client is auto-generated from the OpenAPI specification. However, the upstream spec has some issues that need to be corrected before generation.
+
+**Step 1: Download and fix the OpenAPI spec**
+
+Run the fix script to download the latest spec and apply necessary corrections:
+
+```bash
+pdm run python scripts/fix_openapi_spec.py
 ```
-openapi-python-client generate --url https://api-v2.pendle.finance/core/docs-json --meta pdm --output-path src --config openapi.yaml --overwrite
+
+This script:
+- Downloads the OpenAPI spec from `https://api-v2.pendle.finance/core/docs-json`
+- Fixes the `TotalFeesWithTimestamp` schema by removing `totalFees` from required fields (it's sometimes missing in API responses)
+- Saves the corrected spec to `corrected-openapi.json`
+
+**Step 2: Generate the client code**
+
+Use the corrected spec to generate the client:
+
+```bash
+openapi-python-client generate --path corrected-openapi.json --meta pdm --output-path src --config openapi.yaml --overwrite
 ```
+
+**Note:** Always run the fix script first when regenerating the client to ensure the spec is up-to-date and corrected.

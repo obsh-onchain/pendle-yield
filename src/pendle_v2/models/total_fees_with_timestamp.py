@@ -1,10 +1,12 @@
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 from dateutil.parser import isoparse
+
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="TotalFeesWithTimestamp")
 
@@ -14,11 +16,11 @@ class TotalFeesWithTimestamp:
     """
     Attributes:
         time (datetime.datetime): timestamp where total fee is being calculated
-        total_fees (float): total fees at given timestamp
+        total_fees (Union[Unset, float]): total fees at given timestamp
     """
 
     time: datetime.datetime
-    total_fees: float
+    total_fees: Union[Unset, float] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -31,9 +33,10 @@ class TotalFeesWithTimestamp:
         field_dict.update(
             {
                 "time": time,
-                "totalFees": total_fees,
             }
         )
+        if total_fees is not UNSET:
+            field_dict["totalFees"] = total_fees
 
         return field_dict
 
@@ -42,7 +45,7 @@ class TotalFeesWithTimestamp:
         d = dict(src_dict)
         time = isoparse(d.pop("time"))
 
-        total_fees = d.pop("totalFees")
+        total_fees = d.pop("totalFees", UNSET)
 
         total_fees_with_timestamp = cls(
             time=time,
