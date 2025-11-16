@@ -23,11 +23,11 @@ T = TypeVar("T", bound="MarketResponse")
 class MarketResponse:
     """
     Attributes:
-        id (str):
-        chain_id (float):
-        address (str):
-        symbol (str):
-        expiry (datetime.datetime):
+        id (str): Unique identifier of the market in format "{chainId}-{address}"
+        chain_id (float): Chain ID where the market is deployed
+        address (str): Contract address of the market
+        symbol (str): Symbol of the market
+        expiry (datetime.datetime): Expiry date of the PT/YT tokens
         pt (AssetResponse):
         yt (AssetResponse):
         sy (AssetResponse):
@@ -37,14 +37,14 @@ class MarketResponse:
         reward_tokens (list['AssetResponse']):
         input_tokens (list['AssetResponse']):
         output_tokens (list['AssetResponse']):
-        asset_representation (str):
-        is_whitelisted_pro (bool):
-        is_whitelisted_simple (bool):
-        votable (bool):
-        is_active (bool):
-        is_whitelisted_limit_order (bool):
-        category_ids (list[str]):
-        timestamp (datetime.datetime):
+        asset_representation (str): String representation of the asset type for this market
+        is_whitelisted_pro (bool): Whether this market is whitelisted for pro interface
+        is_whitelisted_simple (bool): Whether this market is whitelisted for simple interface
+        votable (bool): Whether this market can receive vePENDLE votes
+        is_active (bool): Whether the market is currently active (not expired and not manually deactivated)
+        is_whitelisted_limit_order (bool): Whether limit orders are enabled for this market
+        category_ids (list[str]): Array of category IDs this market belongs to
+        timestamp (datetime.datetime): Timestamp when the market data was last updated
         scalar_root (float):
         initial_anchor (float):
         extended_info (MarketExtendedInfoResponse):
@@ -68,43 +68,48 @@ class MarketResponse:
         pro_symbol (Union[None, Unset, str]):
         pro_icon (Union[None, Unset, str]):
         accent_color (Union[None, Unset, str]):
-        total_pt (Union[None, Unset, float]):
-        total_sy (Union[None, Unset, float]):
-        total_lp (Union[None, Unset, float]):
-        total_active_supply (Union[None, Unset, float]):
-        liquidity (Union['ValuationResponse', None, Unset]):
-        trading_volume (Union['ValuationResponse', None, Unset]):
-        underlying_interest_apy (Union[None, Unset, float]):
-        underlying_reward_apy (Union[None, Unset, float]):
+        total_pt (Union[None, Unset, float]): Total PT in the market
+        total_sy (Union[None, Unset, float]): Total SY in the market
+        total_lp (Union[None, Unset, float]): Total supply of the LP token
+        total_active_supply (Union[None, Unset, float]): Total active supply of the LP token, used for calculate
+            boosting
+        liquidity (Union['ValuationResponse', None, Unset]): Market liquidity, this is the liquidity of PT and SY in the
+            AMM
+        trading_volume (Union['ValuationResponse', None, Unset]): Market 24h trading volume
+        underlying_interest_apy (Union[None, Unset, float]): Annual percentage yield from the underlying asset interest
+        underlying_reward_apy (Union[None, Unset, float]): Annual percentage yield from the underlying asset rewards
         underlying_reward_apy_breakdown (Union[None, Unset, list['ApyBreakdownResponse']]):
-        underlying_apy (Union[None, Unset, float]):
-        implied_apy (Union[None, Unset, float]):
-        yt_floating_apy (Union[None, Unset, float]):
-        pt_discount (Union[None, Unset, float]):
-        swap_fee_apy (Union[None, Unset, float]):
-        pendle_apy (Union[None, Unset, float]):
-        arb_apy (Union[None, Unset, float]):
-        aggregated_apy (Union[None, Unset, float]):
-        max_boosted_apy (Union[None, Unset, float]):
-        lp_reward_apy (Union[None, Unset, float]):
-        voter_apy (Union[None, Unset, float]):
-        yt_roi (Union[None, Unset, float]):
-        pt_roi (Union[None, Unset, float]):
+        underlying_apy (Union[None, Unset, float]): APY of the underlying asset
+        implied_apy (Union[None, Unset, float]): Implied APY of market
+        yt_floating_apy (Union[None, Unset, float]): Floating APY for YT holders (underlyingApy - impliedApy)
+        pt_discount (Union[None, Unset, float]): PT discount relative to underlying asset
+        swap_fee_apy (Union[None, Unset, float]): Swap fee APY for LP holders, without boosting
+        pendle_apy (Union[None, Unset, float]): APY from Pendle rewards
+        arb_apy (Union[None, Unset, float]): APY from arbitrage opportunities
+        aggregated_apy (Union[None, Unset, float]): APY including yield, swap fee and Pendle rewards without boosting
+        max_boosted_apy (Union[None, Unset, float]): APY when maximum boost is applied
+        lp_reward_apy (Union[None, Unset, float]): APY from LP reward tokens
+        voter_apy (Union[None, Unset, float]): APY for voters (vePENDLE holders) from voting on this pool
+        yt_roi (Union[None, Unset, float]): Return on investment for YT holders
+        pt_roi (Union[None, Unset, float]): Return on investment for PT holders
         estimated_daily_pool_rewards (Union[None, Unset, list['EstimatedDailyPoolRewardResponse']]):
         data_updated_at (Union[None, Unset, datetime.datetime]):
-        liquidity_change_24_h (Union[None, Unset, float]):
-        trading_volume_change_24_h (Union[None, Unset, float]):
-        underlying_interest_apy_change_24_h (Union[None, Unset, float]):
-        underlying_reward_apy_change_24_h (Union[None, Unset, float]):
-        underlying_apy_change_24_h (Union[None, Unset, float]):
-        implied_apy_change_24_h (Union[None, Unset, float]):
-        yt_floating_apy_change_24_h (Union[None, Unset, float]):
-        pt_discount_change_24_h (Union[None, Unset, float]):
-        swap_fee_apy_change_24_h (Union[None, Unset, float]):
-        pendle_apy_change_24_h (Union[None, Unset, float]):
-        aggregated_apy_change_24_h (Union[None, Unset, float]):
-        lp_reward_apy_change_24_h (Union[None, Unset, float]):
-        voter_apy_change_24_h (Union[None, Unset, float]):
+        liquidity_change_24_h (Union[None, Unset, float]): 24-hour percentage change in liquidity
+        trading_volume_change_24_h (Union[None, Unset, float]): 24-hour percentage change in trading volume
+        underlying_interest_apy_change_24_h (Union[None, Unset, float]): 24-hour change in underlying interest APY (in
+            percentage points)
+        underlying_reward_apy_change_24_h (Union[None, Unset, float]): 24-hour change in underlying reward APY (in
+            percentage points)
+        underlying_apy_change_24_h (Union[None, Unset, float]): 24-hour change in underlying APY (in percentage points)
+        implied_apy_change_24_h (Union[None, Unset, float]): 24-hour change in implied APY (in percentage points)
+        yt_floating_apy_change_24_h (Union[None, Unset, float]): 24-hour change in YT floating APY (in percentage
+            points)
+        pt_discount_change_24_h (Union[None, Unset, float]): 24-hour change in PT discount (in percentage points)
+        swap_fee_apy_change_24_h (Union[None, Unset, float]): 24-hour change in swap fee APY (in percentage points)
+        pendle_apy_change_24_h (Union[None, Unset, float]): 24-hour change in PENDLE APY (in percentage points)
+        aggregated_apy_change_24_h (Union[None, Unset, float]): 24-hour change in aggregated APY (in percentage points)
+        lp_reward_apy_change_24_h (Union[None, Unset, float]): 24-hour change in LP reward APY (in percentage points)
+        voter_apy_change_24_h (Union[None, Unset, float]): 24-hour change in voter APY (in percentage points)
         is_featured (Union[None, Unset, bool]):
         is_popular (Union[None, Unset, bool]):
         tvl_threshold_timestamp (Union[None, Unset, datetime.datetime]):

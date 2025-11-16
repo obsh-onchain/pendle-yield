@@ -9,7 +9,7 @@ from dateutil.parser import isoparse
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.market_details import MarketDetails
+    from ..models.market_details_v2_entity import MarketDetailsV2Entity
 
 
 T = TypeVar("T", bound="MarketCrossChainData")
@@ -26,7 +26,7 @@ class MarketCrossChainData:
         yt (str): market yt id Example: 1-0xed97f94dd94255637a054098604e0201c442a3fd.
         sy (str): market sy id Example: 1-0xe05082b184a34668cd8a904d85fa815802bbb04c.
         underlying_asset (str): market underlying asset id Example: 1-0xa663b02cf0a4b149d2ad41910cb81e23e1c41c32.
-        details (MarketDetails):
+        details (MarketDetailsV2Entity):
         is_new (bool): Whether the market is new
         is_prime (bool): Whether the market is prime
         timestamp (datetime.datetime): Market deployed timestamp
@@ -42,7 +42,7 @@ class MarketCrossChainData:
     yt: str
     sy: str
     underlying_asset: str
-    details: "MarketDetails"
+    details: "MarketDetailsV2Entity"
     is_new: bool
     is_prime: bool
     timestamp: datetime.datetime
@@ -109,7 +109,7 @@ class MarketCrossChainData:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.market_details import MarketDetails
+        from ..models.market_details_v2_entity import MarketDetailsV2Entity
 
         d = dict(src_dict)
         name = d.pop("name")
@@ -126,7 +126,7 @@ class MarketCrossChainData:
 
         underlying_asset = d.pop("underlyingAsset")
 
-        details = MarketDetails.from_dict(d.pop("details"))
+        details = MarketDetailsV2Entity.from_dict(d.pop("details"))
 
         is_new = d.pop("isNew")
 

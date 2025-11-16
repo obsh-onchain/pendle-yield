@@ -62,10 +62,21 @@ def sync_detailed(
     token: str,
     chain_id: Union[Unset, float] = UNSET,
 ) -> Response[GetDistinctUsersFromTokenEntity]:
-    """Get unique users for token
+    """Get distinct users for a specific token
+
+     Returns a list of unique wallet addresses that have interacted with a specific token across Pendle
+    markets.
+
+    Use the optional `chainId` parameter to filter results to a specific chain, or omit it to get users
+    across all chains.
+
+    Common use cases include:
+    - Token holder analysis
+    - User adoption metrics
+    - Market participation statistics
 
     Args:
-        token (str):
+        token (str):  Example: 0x0000000000000000000000000000000000000000.
         chain_id (Union[Unset, float]):
 
     Raises:
@@ -94,10 +105,21 @@ def sync(
     token: str,
     chain_id: Union[Unset, float] = UNSET,
 ) -> Optional[GetDistinctUsersFromTokenEntity]:
-    """Get unique users for token
+    """Get distinct users for a specific token
+
+     Returns a list of unique wallet addresses that have interacted with a specific token across Pendle
+    markets.
+
+    Use the optional `chainId` parameter to filter results to a specific chain, or omit it to get users
+    across all chains.
+
+    Common use cases include:
+    - Token holder analysis
+    - User adoption metrics
+    - Market participation statistics
 
     Args:
-        token (str):
+        token (str):  Example: 0x0000000000000000000000000000000000000000.
         chain_id (Union[Unset, float]):
 
     Raises:
@@ -121,10 +143,21 @@ async def asyncio_detailed(
     token: str,
     chain_id: Union[Unset, float] = UNSET,
 ) -> Response[GetDistinctUsersFromTokenEntity]:
-    """Get unique users for token
+    """Get distinct users for a specific token
+
+     Returns a list of unique wallet addresses that have interacted with a specific token across Pendle
+    markets.
+
+    Use the optional `chainId` parameter to filter results to a specific chain, or omit it to get users
+    across all chains.
+
+    Common use cases include:
+    - Token holder analysis
+    - User adoption metrics
+    - Market participation statistics
 
     Args:
-        token (str):
+        token (str):  Example: 0x0000000000000000000000000000000000000000.
         chain_id (Union[Unset, float]):
 
     Raises:
@@ -151,10 +184,21 @@ async def asyncio(
     token: str,
     chain_id: Union[Unset, float] = UNSET,
 ) -> Optional[GetDistinctUsersFromTokenEntity]:
-    """Get unique users for token
+    """Get distinct users for a specific token
+
+     Returns a list of unique wallet addresses that have interacted with a specific token across Pendle
+    markets.
+
+    Use the optional `chainId` parameter to filter results to a specific chain, or omit it to get users
+    across all chains.
+
+    Common use cases include:
+    - Token holder analysis
+    - User adoption metrics
+    - Market participation statistics
 
     Args:
-        token (str):
+        token (str):  Example: 0x0000000000000000000000000000000000000000.
         chain_id (Union[Unset, float]):
 
     Raises:

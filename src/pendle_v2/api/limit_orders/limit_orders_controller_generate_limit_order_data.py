@@ -65,7 +65,9 @@ def sync_detailed(
     client: Union[AuthenticatedClient, Client],
     body: GenerateLimitOrderDataDto,
 ) -> Response[Union[GenerateLimitOrderDataResponse, HttpErrorResponse]]:
-    """Generate limit order data
+    """Generate limit order data for signing
+
+     Generate the limit order payload for signing with your private key/wallet
 
     Args:
         body (GenerateLimitOrderDataDto):
@@ -94,7 +96,9 @@ def sync(
     client: Union[AuthenticatedClient, Client],
     body: GenerateLimitOrderDataDto,
 ) -> Optional[Union[GenerateLimitOrderDataResponse, HttpErrorResponse]]:
-    """Generate limit order data
+    """Generate limit order data for signing
+
+     Generate the limit order payload for signing with your private key/wallet
 
     Args:
         body (GenerateLimitOrderDataDto):
@@ -118,7 +122,9 @@ async def asyncio_detailed(
     client: Union[AuthenticatedClient, Client],
     body: GenerateLimitOrderDataDto,
 ) -> Response[Union[GenerateLimitOrderDataResponse, HttpErrorResponse]]:
-    """Generate limit order data
+    """Generate limit order data for signing
+
+     Generate the limit order payload for signing with your private key/wallet
 
     Args:
         body (GenerateLimitOrderDataDto):
@@ -145,7 +151,9 @@ async def asyncio(
     client: Union[AuthenticatedClient, Client],
     body: GenerateLimitOrderDataDto,
 ) -> Optional[Union[GenerateLimitOrderDataResponse, HttpErrorResponse]]:
-    """Generate limit order data
+    """Generate limit order data for signing
+
+     Generate the limit order payload for signing with your private key/wallet
 
     Args:
         body (GenerateLimitOrderDataDto):

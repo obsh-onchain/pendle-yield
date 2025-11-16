@@ -86,7 +86,9 @@ def sync_detailed(
     timestamp_start: Union[Unset, datetime.datetime] = UNSET,
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
 ) -> Response[MarketHistoricalDataTableResponse]:
-    """Get market history data by address in table format
+    """Get market time-series data by address
+
+     Returns the time-series data for a given market address. Useful to draw charts.
 
     Args:
         chain_id (float):
@@ -130,7 +132,9 @@ def sync(
     timestamp_start: Union[Unset, datetime.datetime] = UNSET,
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
 ) -> Optional[MarketHistoricalDataTableResponse]:
-    """Get market history data by address in table format
+    """Get market time-series data by address
+
+     Returns the time-series data for a given market address. Useful to draw charts.
 
     Args:
         chain_id (float):
@@ -169,7 +173,9 @@ async def asyncio_detailed(
     timestamp_start: Union[Unset, datetime.datetime] = UNSET,
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
 ) -> Response[MarketHistoricalDataTableResponse]:
-    """Get market history data by address in table format
+    """Get market time-series data by address
+
+     Returns the time-series data for a given market address. Useful to draw charts.
 
     Args:
         chain_id (float):
@@ -211,7 +217,9 @@ async def asyncio(
     timestamp_start: Union[Unset, datetime.datetime] = UNSET,
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
 ) -> Optional[MarketHistoricalDataTableResponse]:
-    """Get market history data by address in table format
+    """Get market time-series data by address
+
+     Returns the time-series data for a given market address. Useful to draw charts.
 
     Args:
         chain_id (float):

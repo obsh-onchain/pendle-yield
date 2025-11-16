@@ -42,8 +42,7 @@ class TotalFeesWithTimestamp:
         d = dict(src_dict)
         time = isoparse(d.pop("time"))
 
-        # Handle missing totalFees field gracefully (some API responses don't include it)
-        total_fees = d.pop("totalFees", 0.0)
+        total_fees = d.pop("totalFees")
 
         total_fees_with_timestamp = cls(
             time=time,

@@ -7,6 +7,7 @@ from attrs import field as _attrs_field
 from ..models.swap_event_event_type import SwapEventEventType
 
 if TYPE_CHECKING:
+    from ..models.block_entity import BlockEntity
     from ..models.reserves import Reserves
 
 
@@ -17,13 +18,14 @@ T = TypeVar("T", bound="SwapEvent")
 class SwapEvent:
     """
     Attributes:
-        event_type (SwapEventEventType): Type of event
+        block (BlockEntity):
         txn_id (str): Transaction hash
         txn_index (float): Transaction index
         event_index (float): Event index
         maker (str): Transaction maker
         pair_id (str): Pair ID
         reserves (Reserves):
+        event_type (SwapEventEventType): Type of event Example: swap.
         asset_0_in (str): Amount of token0 in
         asset_1_in (str): Amount of token1 in
         asset_0_out (str): Amount of token0 out
@@ -31,13 +33,14 @@ class SwapEvent:
         price_native (str): Price of asset0 quoted in asset1
     """
 
-    event_type: SwapEventEventType
+    block: "BlockEntity"
     txn_id: str
     txn_index: float
     event_index: float
     maker: str
     pair_id: str
     reserves: "Reserves"
+    event_type: SwapEventEventType
     asset_0_in: str
     asset_1_in: str
     asset_0_out: str
@@ -46,7 +49,7 @@ class SwapEvent:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        event_type = self.event_type.value
+        block = self.block.to_dict()
 
         txn_id = self.txn_id
 
@@ -59,6 +62,8 @@ class SwapEvent:
         pair_id = self.pair_id
 
         reserves = self.reserves.to_dict()
+
+        event_type = self.event_type.value
 
         asset_0_in = self.asset_0_in
 
@@ -74,13 +79,14 @@ class SwapEvent:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "eventType": event_type,
+                "block": block,
                 "txnId": txn_id,
                 "txnIndex": txn_index,
                 "eventIndex": event_index,
                 "maker": maker,
                 "pairId": pair_id,
                 "reserves": reserves,
+                "eventType": event_type,
                 "asset0In": asset_0_in,
                 "asset1In": asset_1_in,
                 "asset0Out": asset_0_out,
@@ -93,10 +99,11 @@ class SwapEvent:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.block_entity import BlockEntity
         from ..models.reserves import Reserves
 
         d = dict(src_dict)
-        event_type = SwapEventEventType(d.pop("eventType"))
+        block = BlockEntity.from_dict(d.pop("block"))
 
         txn_id = d.pop("txnId")
 
@@ -110,6 +117,8 @@ class SwapEvent:
 
         reserves = Reserves.from_dict(d.pop("reserves"))
 
+        event_type = SwapEventEventType(d.pop("eventType"))
+
         asset_0_in = d.pop("asset0In")
 
         asset_1_in = d.pop("asset1In")
@@ -121,13 +130,14 @@ class SwapEvent:
         price_native = d.pop("priceNative")
 
         swap_event = cls(
-            event_type=event_type,
+            block=block,
             txn_id=txn_id,
             txn_index=txn_index,
             event_index=event_index,
             maker=maker,
             pair_id=pair_id,
             reserves=reserves,
+            event_type=event_type,
             asset_0_in=asset_0_in,
             asset_1_in=asset_1_in,
             asset_0_out=asset_0_out,

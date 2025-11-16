@@ -19,16 +19,16 @@ T = TypeVar("T", bound="TransactionV5Response")
 class TransactionV5Response:
     """
     Attributes:
-        id (str):
-        market (str):
-        timestamp (datetime.datetime):
-        chain_id (float):
-        tx_hash (str):
-        value (float):
-        type_ (str):
-        action (str):
-        implied_apy (float):
-        tx_origin (Union[Unset, str]):
+        id (str): Unique identifier of the transaction
+        market (str): Market address where the transaction occurred
+        timestamp (datetime.datetime): Timestamp when the transaction occurred
+        chain_id (float): Chain ID where the transaction occurred
+        tx_hash (str): Transaction hash on the blockchain
+        value (float): Transaction value in USD
+        type_ (str): Transaction type (e.g., TRADES, ADD_LIQUIDITY, REMOVE_LIQUIDITY)
+        action (str): Transaction action (e.g., BUY_PT, SELL_PT, ADD_LIQUIDITY_DUAL)
+        implied_apy (float): Weighted average implied APY for this transaction
+        tx_origin (Union[Unset, str]): Original transaction sender address
         notional (Union[Unset, NotionalV5]):
     """
 

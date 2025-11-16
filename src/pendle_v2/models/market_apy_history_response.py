@@ -13,9 +13,9 @@ T = TypeVar("T", bound="MarketApyHistoryResponse")
 class MarketApyHistoryResponse:
     """
     Attributes:
-        timestamp (datetime.datetime):
-        underlying_apy (float):
-        implied_apy (float):
+        timestamp (datetime.datetime): Timestamp of the APY data point
+        underlying_apy (float): APY of the underlying asset
+        implied_apy (float): Implied APY of market
     """
 
     timestamp: datetime.datetime

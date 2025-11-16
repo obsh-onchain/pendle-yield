@@ -17,18 +17,18 @@ T = TypeVar("T", bound="PoolV2Response")
 class PoolV2Response:
     """
     Attributes:
-        id (str):
-        symbol (str):
-        expiry (str):
-        current_voter_apr (Union[Unset, float]):
-        last_epoch_voter_apr (Union[Unset, float]):
-        current_swap_fee (Union[Unset, float]):
-        last_epoch_swap_fee (Union[Unset, float]):
-        projected_voter_apr (Union[Unset, float]):
-        projected_votes (Union['VoteV2Response', None, Unset]):
-        current_votes (Union['VoteV2Response', None, Unset]):
-        expected_cap (Union[Unset, str]):
-        current_cap (Union[Unset, str]):
+        id (str): Unique identifier of the pool (market)
+        symbol (str): Symbol of the pool (market)
+        expiry (str): Expiry date of the pool (market)
+        current_voter_apr (Union[Unset, float]): Voter APR for current epoch
+        last_epoch_voter_apr (Union[Unset, float]): Voter APR from last epoch
+        current_swap_fee (Union[Unset, float]): Swap fees collected in current epoch (in USD)
+        last_epoch_swap_fee (Union[Unset, float]): Swap fees collected in last epoch (in USD)
+        projected_voter_apr (Union[Unset, float]): Projected voter APR for next epoch
+        projected_votes (Union['VoteV2Response', None, Unset]): Projected votes for next epoch
+        current_votes (Union['VoteV2Response', None, Unset]): Votes in current epoch
+        expected_cap (Union[Unset, str]): Expected incentive cap for next epoch (BigInt string)
+        current_cap (Union[Unset, str]): Current incentive cap for this epoch (BigInt string)
     """
 
     id: str

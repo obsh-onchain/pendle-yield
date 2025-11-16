@@ -70,7 +70,10 @@ def sync_detailed(
     token_out: str,
     target_implied_apy: float,
 ) -> Response[SwapAmountToChangeApyResponse]:
-    """Get the amount required to swap in the market to change the implied apy to XXX
+    """Get market liquidity depth by address
+
+     Get the amount required to swap in the market to change the implied apy to a given target, including
+    liquidity from order books and AMM
 
     Args:
         chain_id (float):
@@ -111,7 +114,10 @@ def sync(
     token_out: str,
     target_implied_apy: float,
 ) -> Optional[SwapAmountToChangeApyResponse]:
-    """Get the amount required to swap in the market to change the implied apy to XXX
+    """Get market liquidity depth by address
+
+     Get the amount required to swap in the market to change the implied apy to a given target, including
+    liquidity from order books and AMM
 
     Args:
         chain_id (float):
@@ -147,7 +153,10 @@ async def asyncio_detailed(
     token_out: str,
     target_implied_apy: float,
 ) -> Response[SwapAmountToChangeApyResponse]:
-    """Get the amount required to swap in the market to change the implied apy to XXX
+    """Get market liquidity depth by address
+
+     Get the amount required to swap in the market to change the implied apy to a given target, including
+    liquidity from order books and AMM
 
     Args:
         chain_id (float):
@@ -186,7 +195,10 @@ async def asyncio(
     token_out: str,
     target_implied_apy: float,
 ) -> Optional[SwapAmountToChangeApyResponse]:
-    """Get the amount required to swap in the market to change the implied apy to XXX
+    """Get market liquidity depth by address
+
+     Get the amount required to swap in the market to change the implied apy to a given target, including
+    liquidity from order books and AMM
 
     Args:
         chain_id (float):

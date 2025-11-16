@@ -52,7 +52,7 @@ def sync_detailed(
 ) -> Response[SupportedAggregatorsResponse]:
     """Get supported aggregators for a chain
 
-     Get supported aggregators for a chain
+     Return supported aggregators for a chain, and the computing unit cost for each aggregator
 
     Args:
         chain_id (float):
@@ -83,7 +83,7 @@ def sync(
 ) -> Optional[SupportedAggregatorsResponse]:
     """Get supported aggregators for a chain
 
-     Get supported aggregators for a chain
+     Return supported aggregators for a chain, and the computing unit cost for each aggregator
 
     Args:
         chain_id (float):
@@ -109,7 +109,7 @@ async def asyncio_detailed(
 ) -> Response[SupportedAggregatorsResponse]:
     """Get supported aggregators for a chain
 
-     Get supported aggregators for a chain
+     Return supported aggregators for a chain, and the computing unit cost for each aggregator
 
     Args:
         chain_id (float):
@@ -138,7 +138,7 @@ async def asyncio(
 ) -> Optional[SupportedAggregatorsResponse]:
     """Get supported aggregators for a chain
 
-     Get supported aggregators for a chain
+     Return supported aggregators for a chain, and the computing unit cost for each aggregator
 
     Args:
         chain_id (float):

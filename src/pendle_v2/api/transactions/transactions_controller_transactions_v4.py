@@ -107,7 +107,24 @@ def sync_detailed(
     max_value: Union[Unset, float] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Response[TransactionsV4Response]:
-    """Get raw transactions
+    r"""Get events from router, market, or YT
+
+     Return events emitted from router, market, or YT. This endpoint does not include events from limit
+    order.
+
+    When a user interact with our apps, multiple events will be emitted within the same transaction,
+    this endpoint will return all of them seperately. Therefore, this endpoint is only suitable if you
+    want to see all the events that happened in a transaction.
+
+    Example, when a user swap a token to PT, two events with action \"SWAP_PT\" will be emitted, with
+    different origin \"ROUTER\" and \"PENDLE_MARKET\". Please check our
+    [HighLevelArchitecture](https://docs.pendle.finance/pendle-v2/Developers/HighLevelArchitecture) for
+    more information.
+
+    **Unless you really need the breakdown of each event, we recommend you use the [Get market
+    transactions by address](#tag/transactions/get/v5/{chainId}/transactions/{address}) above**, where
+    we smartly group the events based on their type and action, it also includes the valuation of the
+    transaction.
 
     Args:
         chain_id (float):
@@ -169,7 +186,24 @@ def sync(
     max_value: Union[Unset, float] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Optional[TransactionsV4Response]:
-    """Get raw transactions
+    r"""Get events from router, market, or YT
+
+     Return events emitted from router, market, or YT. This endpoint does not include events from limit
+    order.
+
+    When a user interact with our apps, multiple events will be emitted within the same transaction,
+    this endpoint will return all of them seperately. Therefore, this endpoint is only suitable if you
+    want to see all the events that happened in a transaction.
+
+    Example, when a user swap a token to PT, two events with action \"SWAP_PT\" will be emitted, with
+    different origin \"ROUTER\" and \"PENDLE_MARKET\". Please check our
+    [HighLevelArchitecture](https://docs.pendle.finance/pendle-v2/Developers/HighLevelArchitecture) for
+    more information.
+
+    **Unless you really need the breakdown of each event, we recommend you use the [Get market
+    transactions by address](#tag/transactions/get/v5/{chainId}/transactions/{address}) above**, where
+    we smartly group the events based on their type and action, it also includes the valuation of the
+    transaction.
 
     Args:
         chain_id (float):
@@ -226,7 +260,24 @@ async def asyncio_detailed(
     max_value: Union[Unset, float] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Response[TransactionsV4Response]:
-    """Get raw transactions
+    r"""Get events from router, market, or YT
+
+     Return events emitted from router, market, or YT. This endpoint does not include events from limit
+    order.
+
+    When a user interact with our apps, multiple events will be emitted within the same transaction,
+    this endpoint will return all of them seperately. Therefore, this endpoint is only suitable if you
+    want to see all the events that happened in a transaction.
+
+    Example, when a user swap a token to PT, two events with action \"SWAP_PT\" will be emitted, with
+    different origin \"ROUTER\" and \"PENDLE_MARKET\". Please check our
+    [HighLevelArchitecture](https://docs.pendle.finance/pendle-v2/Developers/HighLevelArchitecture) for
+    more information.
+
+    **Unless you really need the breakdown of each event, we recommend you use the [Get market
+    transactions by address](#tag/transactions/get/v5/{chainId}/transactions/{address}) above**, where
+    we smartly group the events based on their type and action, it also includes the valuation of the
+    transaction.
 
     Args:
         chain_id (float):
@@ -286,7 +337,24 @@ async def asyncio(
     max_value: Union[Unset, float] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Optional[TransactionsV4Response]:
-    """Get raw transactions
+    r"""Get events from router, market, or YT
+
+     Return events emitted from router, market, or YT. This endpoint does not include events from limit
+    order.
+
+    When a user interact with our apps, multiple events will be emitted within the same transaction,
+    this endpoint will return all of them seperately. Therefore, this endpoint is only suitable if you
+    want to see all the events that happened in a transaction.
+
+    Example, when a user swap a token to PT, two events with action \"SWAP_PT\" will be emitted, with
+    different origin \"ROUTER\" and \"PENDLE_MARKET\". Please check our
+    [HighLevelArchitecture](https://docs.pendle.finance/pendle-v2/Developers/HighLevelArchitecture) for
+    more information.
+
+    **Unless you really need the breakdown of each event, we recommend you use the [Get market
+    transactions by address](#tag/transactions/get/v5/{chainId}/transactions/{address}) above**, where
+    we smartly group the events based on their type and action, it also includes the valuation of the
+    transaction.
 
     Args:
         chain_id (float):

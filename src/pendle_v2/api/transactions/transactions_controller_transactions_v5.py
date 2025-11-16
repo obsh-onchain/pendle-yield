@@ -82,10 +82,10 @@ def sync_detailed(
     tx_origin: Union[Unset, str] = UNSET,
     action: Union[Unset, str] = UNSET,
 ) -> Response[TransactionsV5Response]:
-    """Get calculated transactions
+    """Get market transactions by address
 
-     Smart-grouped transactions where multiple raw transactions are combined based on their type and
-    action.
+     Return transactions with: user action (long or short yield, add or remove liquidity), valuation,
+    implied apy.
 
     Args:
         chain_id (float):
@@ -135,10 +135,10 @@ def sync(
     tx_origin: Union[Unset, str] = UNSET,
     action: Union[Unset, str] = UNSET,
 ) -> Optional[TransactionsV5Response]:
-    """Get calculated transactions
+    """Get market transactions by address
 
-     Smart-grouped transactions where multiple raw transactions are combined based on their type and
-    action.
+     Return transactions with: user action (long or short yield, add or remove liquidity), valuation,
+    implied apy.
 
     Args:
         chain_id (float):
@@ -183,10 +183,10 @@ async def asyncio_detailed(
     tx_origin: Union[Unset, str] = UNSET,
     action: Union[Unset, str] = UNSET,
 ) -> Response[TransactionsV5Response]:
-    """Get calculated transactions
+    """Get market transactions by address
 
-     Smart-grouped transactions where multiple raw transactions are combined based on their type and
-    action.
+     Return transactions with: user action (long or short yield, add or remove liquidity), valuation,
+    implied apy.
 
     Args:
         chain_id (float):
@@ -234,10 +234,10 @@ async def asyncio(
     tx_origin: Union[Unset, str] = UNSET,
     action: Union[Unset, str] = UNSET,
 ) -> Optional[TransactionsV5Response]:
-    """Get calculated transactions
+    """Get market transactions by address
 
-     Smart-grouped transactions where multiple raw transactions are combined based on their type and
-    action.
+     Return transactions with: user action (long or short yield, add or remove liquidity), valuation,
+    implied apy.
 
     Args:
         chain_id (float):

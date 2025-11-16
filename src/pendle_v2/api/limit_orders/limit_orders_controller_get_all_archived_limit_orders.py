@@ -89,7 +89,15 @@ def sync_detailed(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Response[LimitOrdersV2Response]:
-    """Get all archived limit orders with resume token
+    """Get all archived limit orders for analytics
+
+     This have the same interface and usecase as the endpoint above, but it returns the archived orders
+
+    When an order is not fillable anymore, we **might** archive it to save storage space, to fetch it,
+    use this endpoint.
+
+    So to fetch full limit orders in history, using this and the endpoint above. Not all orders are
+    archived, it depends on some conditions.
 
     Args:
         chain_id (Union[Unset, float]):
@@ -136,7 +144,15 @@ def sync(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Optional[LimitOrdersV2Response]:
-    """Get all archived limit orders with resume token
+    """Get all archived limit orders for analytics
+
+     This have the same interface and usecase as the endpoint above, but it returns the archived orders
+
+    When an order is not fillable anymore, we **might** archive it to save storage space, to fetch it,
+    use this endpoint.
+
+    So to fetch full limit orders in history, using this and the endpoint above. Not all orders are
+    archived, it depends on some conditions.
 
     Args:
         chain_id (Union[Unset, float]):
@@ -178,7 +194,15 @@ async def asyncio_detailed(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Response[LimitOrdersV2Response]:
-    """Get all archived limit orders with resume token
+    """Get all archived limit orders for analytics
+
+     This have the same interface and usecase as the endpoint above, but it returns the archived orders
+
+    When an order is not fillable anymore, we **might** archive it to save storage space, to fetch it,
+    use this endpoint.
+
+    So to fetch full limit orders in history, using this and the endpoint above. Not all orders are
+    archived, it depends on some conditions.
 
     Args:
         chain_id (Union[Unset, float]):
@@ -223,7 +247,15 @@ async def asyncio(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Optional[LimitOrdersV2Response]:
-    """Get all archived limit orders with resume token
+    """Get all archived limit orders for analytics
+
+     This have the same interface and usecase as the endpoint above, but it returns the archived orders
+
+    When an order is not fillable anymore, we **might** archive it to save storage space, to fetch it,
+    use this endpoint.
+
+    So to fetch full limit orders in history, using this and the endpoint above. Not all orders are
+    archived, it depends on some conditions.
 
     Args:
         chain_id (Union[Unset, float]):

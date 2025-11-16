@@ -11,7 +11,7 @@ T = TypeVar("T", bound="NotionalV5")
 class NotionalV5:
     """
     Attributes:
-        pt (float):
+        pt (float): Notional amount of PT traded
     """
 
     pt: float

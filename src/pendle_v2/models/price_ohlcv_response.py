@@ -19,13 +19,13 @@ T = TypeVar("T", bound="PriceOHLCVResponse")
 class PriceOHLCVResponse:
     """
     Attributes:
-        limit (float):
-        total (float):
-        currency (str):
-        time_frame (str):
+        limit (float): Maximum number of results returned
+        total (float): Total number of data points available
+        currency (str): Currency of the price data (e.g., USD)
+        time_frame (str): Time frame of each OHLCV data point (e.g., "hour", "day", "week")
         results (list['OHLCVDataPoint']):
-        timestamp_start (Union[Unset, datetime.datetime]):
-        timestamp_end (Union[Unset, datetime.datetime]):
+        timestamp_start (Union[Unset, datetime.datetime]): Start timestamp of the data range
+        timestamp_end (Union[Unset, datetime.datetime]): End timestamp of the data range
     """
 
     limit: float

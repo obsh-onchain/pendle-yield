@@ -25,7 +25,8 @@ class LimitOrderResponse:
         id (str): Hash of the order
         signature (str): Signature of order, signed by maker
         chain_id (float): Chain id
-        salt (str): BigInt string of salt
+        salt (str): BigInt string of salt. Salt is a random generated number to distinguish between orders.Because of
+            some technical reason, this number must be dividable by 12421
         expiry (str): BigInt string of expiry, in second
         nonce (str): BigInt string of nonce
         type_ (LimitOrderResponseType): LimitOrderType { 0 : TOKEN_FOR_PT, 1 : PT_FOR_TOKEN, 2 : TOKEN_FOR_YT, 3 :
@@ -37,7 +38,7 @@ class LimitOrderResponse:
         making_amount (str): BigInt string of making amount, the amount of token if the order is TOKEN_FOR_PT or
             TOKEN_FOR_YT, otherwise the amount of PT or YT
         current_making_amount (str): BigInt string of remaining making amount, the unit is the same as makingAmount
-        ln_implied_rate (str): BigInt string of lnImpliedRate
+        ln_implied_rate (str): BigInt string of lnImpliedRate. Natural logarithm of the implied rate
         fail_safe_rate (str): BigInt string of failSafeRate
         permit (str): Bytes string for permit
         order_filled_status (OrderFilledStatusResponse):
@@ -46,7 +47,8 @@ class LimitOrderResponse:
         created_at (datetime.datetime):
         sy (str): SY address
         pt (str): PT address
-        maker_balance (str): Min(maker balance, maker allowance)
+        maker_balance (str): Min(maker balance, maker allowance). How much token the maker has available to use for this
+            order
         failed_mint_sy (bool): Simulate result of the order to mint sy
         failed_mint_sy_reason (str): Error reason of the order to mint sy
         order_book_balance (str): Bigint string of amount shown on order book

@@ -32,13 +32,14 @@ class PnLTransactionEntity:
         lp_data (SpendUnitData):
         price_in_asset (PriceAssetData):
         profit (ValuationEntity):
-        tx_value_asset (float):
-        asset_usd (float):
-        asset_eth (float):
-        pt_exchange_rate (float):
-        effective_pt_exchange_rate (Union[Unset, float]):
-        pt_exchange_rate_after (Union[Unset, float]):
-        tx_hash (Union[Unset, str]):
+        tx_value_asset (float): Total value of the transaction in asset
+        asset_usd (float): Market asset price in USD
+        asset_eth (float): Market asset price in ETH
+        pt_exchange_rate (float): PT exchange rate at the time of the transaction
+        effective_pt_exchange_rate (Union[Unset, float]): Effective PT exchange rate of this transaction
+        pt_exchange_rate_after (Union[Unset, float]): PT exchange rate of market after the transaction
+        tx_hash (Union[Unset, str]): Transaction hash, some event does not have this field, example: merkle reward
+            distribution
     """
 
     chain_id: float

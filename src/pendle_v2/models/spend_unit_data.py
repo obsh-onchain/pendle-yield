@@ -15,7 +15,7 @@ T = TypeVar("T", bound="SpendUnitData")
 class SpendUnitData:
     """
     Attributes:
-        unit (float):
+        unit (float): Balance of user in wei
         spent_v2 (ValuationEntity):
     """
 

@@ -60,7 +60,12 @@ def sync_detailed(
     client: Union[AuthenticatedClient, Client],
     filter_usd: Union[Unset, float] = UNSET,
 ) -> Response[UserPositionsCrossChainResponse]:
-    """Get user positions across all chains
+    """Get user positions by address
+
+     Return all user PT/YT/LP/SY positions across all supported chains.
+
+    All the claimable rewards are cached by 24 hours. If you need the real time claimable data, use read
+    it from RPC!
 
     Args:
         user (str):
@@ -92,7 +97,12 @@ def sync(
     client: Union[AuthenticatedClient, Client],
     filter_usd: Union[Unset, float] = UNSET,
 ) -> Optional[UserPositionsCrossChainResponse]:
-    """Get user positions across all chains
+    """Get user positions by address
+
+     Return all user PT/YT/LP/SY positions across all supported chains.
+
+    All the claimable rewards are cached by 24 hours. If you need the real time claimable data, use read
+    it from RPC!
 
     Args:
         user (str):
@@ -119,7 +129,12 @@ async def asyncio_detailed(
     client: Union[AuthenticatedClient, Client],
     filter_usd: Union[Unset, float] = UNSET,
 ) -> Response[UserPositionsCrossChainResponse]:
-    """Get user positions across all chains
+    """Get user positions by address
+
+     Return all user PT/YT/LP/SY positions across all supported chains.
+
+    All the claimable rewards are cached by 24 hours. If you need the real time claimable data, use read
+    it from RPC!
 
     Args:
         user (str):
@@ -149,7 +164,12 @@ async def asyncio(
     client: Union[AuthenticatedClient, Client],
     filter_usd: Union[Unset, float] = UNSET,
 ) -> Optional[UserPositionsCrossChainResponse]:
-    """Get user positions across all chains
+    """Get user positions by address
+
+     Return all user PT/YT/LP/SY positions across all supported chains.
+
+    All the claimable rewards are cached by 24 hours. If you need the real time claimable data, use read
+    it from RPC!
 
     Args:
         user (str):

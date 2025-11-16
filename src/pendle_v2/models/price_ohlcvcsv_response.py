@@ -11,12 +11,14 @@ T = TypeVar("T", bound="PriceOHLCVCSVResponse")
 class PriceOHLCVCSVResponse:
     """
     Attributes:
-        total (float):
-        currency (str):
-        time_frame (str):
-        timestamp_start (float):
-        timestamp_end (float):
-        results (str):
+        total (float): Total number of data points available
+        currency (str): Always return USD
+        time_frame (str): Time frame of each OHLCV data point (e.g., "1h", "1d", "1w")
+        timestamp_start (float): Start timestamp of the data range in seconds
+        timestamp_end (float): End timestamp of the data range in seconds
+        results (str): Resulting CSV string following the format: time,open,high,low,close,volume Example:
+            time,open,high,low,close,volume
+            1756245600,42.4563,42.4563,42.4563,42.4563,0.0000.
     """
 
     total: float

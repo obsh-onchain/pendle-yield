@@ -100,7 +100,7 @@ def sync_detailed(
     fail_safe_rate: str,
     permit: str,
 ) -> Response[Any]:
-    """Cancel one single limit order
+    """Cancel one single limit order by order hash
 
     Args:
         chain_id (float):
@@ -168,7 +168,7 @@ async def asyncio_detailed(
     fail_safe_rate: str,
     permit: str,
 ) -> Response[Any]:
-    """Cancel one single limit order
+    """Cancel one single limit order by order hash
 
     Args:
         chain_id (float):

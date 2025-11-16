@@ -4,6 +4,7 @@ from enum import Enum
 class MultiRouteConvertResponseAction(str, Enum):
     ADD_LIQUIDITY = "add-liquidity"
     ADD_LIQUIDITY_DUAL = "add-liquidity-dual"
+    CONVERT_LP_TO_PT = "convert-lp-to-pt"
     EXIT_MARKET = "exit-market"
     MINT_PY = "mint-py"
     MINT_SY = "mint-sy"

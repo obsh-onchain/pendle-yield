@@ -71,6 +71,8 @@ def sync_detailed(
 ) -> Response[AllMarketTotalFeesResponse]:
     """Get market fees chart
 
+     Weekly market fees across all markets, grouped by epoch (starting Thursdays).
+
     Args:
         timestamp_start (Union[Unset, datetime.datetime]):
         timestamp_end (Union[Unset, datetime.datetime]):
@@ -103,6 +105,8 @@ def sync(
 ) -> Optional[AllMarketTotalFeesResponse]:
     """Get market fees chart
 
+     Weekly market fees across all markets, grouped by epoch (starting Thursdays).
+
     Args:
         timestamp_start (Union[Unset, datetime.datetime]):
         timestamp_end (Union[Unset, datetime.datetime]):
@@ -129,6 +133,8 @@ async def asyncio_detailed(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
 ) -> Response[AllMarketTotalFeesResponse]:
     """Get market fees chart
+
+     Weekly market fees across all markets, grouped by epoch (starting Thursdays).
 
     Args:
         timestamp_start (Union[Unset, datetime.datetime]):
@@ -159,6 +165,8 @@ async def asyncio(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
 ) -> Optional[AllMarketTotalFeesResponse]:
     """Get market fees chart
+
+     Weekly market fees across all markets, grouped by epoch (starting Thursdays).
 
     Args:
         timestamp_start (Union[Unset, datetime.datetime]):

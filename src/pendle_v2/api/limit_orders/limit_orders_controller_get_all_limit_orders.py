@@ -89,7 +89,17 @@ def sync_detailed(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Response[LimitOrdersV2Response]:
-    """Get all limit orders with resume token
+    """Get all limit orders for analytics
+
+     This endpoint is for analytics purpose, if you want to analyze the limit orders data, this endpoint
+    return all the orders that have been made, including the ones that have been cancelled or fully
+    filled.
+
+    The results could be very large, so each time we returns at most 1000 orders, you can use the
+    resumeToken to fetch the next page.
+
+    To get limit order for filling, use the [Get limit orders to match by YT address​](#tag/limit-
+    orders/get/v1/limit-orders/takers/limit-orders) endpoint!
 
     Args:
         chain_id (Union[Unset, float]):
@@ -136,7 +146,17 @@ def sync(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Optional[LimitOrdersV2Response]:
-    """Get all limit orders with resume token
+    """Get all limit orders for analytics
+
+     This endpoint is for analytics purpose, if you want to analyze the limit orders data, this endpoint
+    return all the orders that have been made, including the ones that have been cancelled or fully
+    filled.
+
+    The results could be very large, so each time we returns at most 1000 orders, you can use the
+    resumeToken to fetch the next page.
+
+    To get limit order for filling, use the [Get limit orders to match by YT address​](#tag/limit-
+    orders/get/v1/limit-orders/takers/limit-orders) endpoint!
 
     Args:
         chain_id (Union[Unset, float]):
@@ -178,7 +198,17 @@ async def asyncio_detailed(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Response[LimitOrdersV2Response]:
-    """Get all limit orders with resume token
+    """Get all limit orders for analytics
+
+     This endpoint is for analytics purpose, if you want to analyze the limit orders data, this endpoint
+    return all the orders that have been made, including the ones that have been cancelled or fully
+    filled.
+
+    The results could be very large, so each time we returns at most 1000 orders, you can use the
+    resumeToken to fetch the next page.
+
+    To get limit order for filling, use the [Get limit orders to match by YT address​](#tag/limit-
+    orders/get/v1/limit-orders/takers/limit-orders) endpoint!
 
     Args:
         chain_id (Union[Unset, float]):
@@ -223,7 +253,17 @@ async def asyncio(
     timestamp_end: Union[Unset, datetime.datetime] = UNSET,
     resume_token: Union[Unset, str] = UNSET,
 ) -> Optional[LimitOrdersV2Response]:
-    """Get all limit orders with resume token
+    """Get all limit orders for analytics
+
+     This endpoint is for analytics purpose, if you want to analyze the limit orders data, this endpoint
+    return all the orders that have been made, including the ones that have been cancelled or fully
+    filled.
+
+    The results could be very large, so each time we returns at most 1000 orders, you can use the
+    resumeToken to fetch the next page.
+
+    To get limit order for filling, use the [Get limit orders to match by YT address​](#tag/limit-
+    orders/get/v1/limit-orders/takers/limit-orders) endpoint!
 
     Args:
         chain_id (Union[Unset, float]):

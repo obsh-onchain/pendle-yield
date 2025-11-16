@@ -104,7 +104,9 @@ def sync_detailed(
     sort_by: Union[Unset, LimitOrdersControllerGetTakerLimitOrdersSortBy] = UNSET,
     sort_order: Union[Unset, LimitOrdersControllerGetTakerLimitOrdersSortOrder] = UNSET,
 ) -> Response[Union[HttpErrorResponse, LimitOrdersTakerResponse]]:
-    """Get limit orders data for taker
+    """Get limit orders to match by YT address
+
+     This endpoint returns best matching limit orders for a given YT address.
 
     Args:
         skip (Union[Unset, float]):  Default: 0.0.
@@ -151,7 +153,9 @@ def sync(
     sort_by: Union[Unset, LimitOrdersControllerGetTakerLimitOrdersSortBy] = UNSET,
     sort_order: Union[Unset, LimitOrdersControllerGetTakerLimitOrdersSortOrder] = UNSET,
 ) -> Optional[Union[HttpErrorResponse, LimitOrdersTakerResponse]]:
-    """Get limit orders data for taker
+    """Get limit orders to match by YT address
+
+     This endpoint returns best matching limit orders for a given YT address.
 
     Args:
         skip (Union[Unset, float]):  Default: 0.0.
@@ -193,7 +197,9 @@ async def asyncio_detailed(
     sort_by: Union[Unset, LimitOrdersControllerGetTakerLimitOrdersSortBy] = UNSET,
     sort_order: Union[Unset, LimitOrdersControllerGetTakerLimitOrdersSortOrder] = UNSET,
 ) -> Response[Union[HttpErrorResponse, LimitOrdersTakerResponse]]:
-    """Get limit orders data for taker
+    """Get limit orders to match by YT address
+
+     This endpoint returns best matching limit orders for a given YT address.
 
     Args:
         skip (Union[Unset, float]):  Default: 0.0.
@@ -238,7 +244,9 @@ async def asyncio(
     sort_by: Union[Unset, LimitOrdersControllerGetTakerLimitOrdersSortBy] = UNSET,
     sort_order: Union[Unset, LimitOrdersControllerGetTakerLimitOrdersSortOrder] = UNSET,
 ) -> Optional[Union[HttpErrorResponse, LimitOrdersTakerResponse]]:
-    """Get limit orders data for taker
+    """Get limit orders to match by YT address
+
+     This endpoint returns best matching limit orders for a given YT address.
 
     Args:
         skip (Union[Unset, float]):  Default: 0.0.

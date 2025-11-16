@@ -13,12 +13,12 @@ T = TypeVar("T", bound="OHLCVDataPoint")
 class OHLCVDataPoint:
     """
     Attributes:
-        time (datetime.datetime):
-        open_ (float):
-        high (float):
-        low (float):
-        close (float):
-        volume (float):
+        time (datetime.datetime): Timestamp of the OHLCV data point
+        open_ (float): Opening price at the start of the time period
+        high (float): Highest price during the time period
+        low (float): Lowest price during the time period
+        close (float): Closing price at the end of the time period
+        volume (float): Trading volume during the time period
     """
 
     time: datetime.datetime

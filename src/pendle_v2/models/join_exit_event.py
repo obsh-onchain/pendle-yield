@@ -7,6 +7,7 @@ from attrs import field as _attrs_field
 from ..models.join_exit_event_event_type import JoinExitEventEventType
 
 if TYPE_CHECKING:
+    from ..models.block_entity import BlockEntity
     from ..models.reserves import Reserves
 
 
@@ -17,30 +18,32 @@ T = TypeVar("T", bound="JoinExitEvent")
 class JoinExitEvent:
     """
     Attributes:
-        event_type (JoinExitEventEventType): Type of event
+        block (BlockEntity):
         txn_id (str): Transaction hash
         txn_index (float): Transaction index
         event_index (float): Event index
         maker (str): Transaction maker
         pair_id (str): Pair ID
         reserves (Reserves):
+        event_type (JoinExitEventEventType): Type of event Example: join.
         amount0 (str): Amount of token0
         amount1 (str): Amount of token1
     """
 
-    event_type: JoinExitEventEventType
+    block: "BlockEntity"
     txn_id: str
     txn_index: float
     event_index: float
     maker: str
     pair_id: str
     reserves: "Reserves"
+    event_type: JoinExitEventEventType
     amount0: str
     amount1: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        event_type = self.event_type.value
+        block = self.block.to_dict()
 
         txn_id = self.txn_id
 
@@ -54,6 +57,8 @@ class JoinExitEvent:
 
         reserves = self.reserves.to_dict()
 
+        event_type = self.event_type.value
+
         amount0 = self.amount0
 
         amount1 = self.amount1
@@ -62,13 +67,14 @@ class JoinExitEvent:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "eventType": event_type,
+                "block": block,
                 "txnId": txn_id,
                 "txnIndex": txn_index,
                 "eventIndex": event_index,
                 "maker": maker,
                 "pairId": pair_id,
                 "reserves": reserves,
+                "eventType": event_type,
                 "amount0": amount0,
                 "amount1": amount1,
             }
@@ -78,10 +84,11 @@ class JoinExitEvent:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.block_entity import BlockEntity
         from ..models.reserves import Reserves
 
         d = dict(src_dict)
-        event_type = JoinExitEventEventType(d.pop("eventType"))
+        block = BlockEntity.from_dict(d.pop("block"))
 
         txn_id = d.pop("txnId")
 
@@ -95,18 +102,21 @@ class JoinExitEvent:
 
         reserves = Reserves.from_dict(d.pop("reserves"))
 
+        event_type = JoinExitEventEventType(d.pop("eventType"))
+
         amount0 = d.pop("amount0")
 
         amount1 = d.pop("amount1")
 
         join_exit_event = cls(
-            event_type=event_type,
+            block=block,
             txn_id=txn_id,
             txn_index=txn_index,
             event_index=event_index,
             maker=maker,
             pair_id=pair_id,
             reserves=reserves,
+            event_type=event_type,
             amount0=amount0,
             amount1=amount1,
         )

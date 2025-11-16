@@ -87,7 +87,13 @@ def sync_detailed(
     type_: Union[Unset, LimitOrdersControllerGetMakerLimitOrderType] = UNSET,
     is_active: Union[Unset, bool] = UNSET,
 ) -> Response[LimitOrdersResponse]:
-    """Get limit orders
+    """Get user limit orders in market
+
+     This endpoint let you fetch limit orders of a user in a market, it have more filter options than the
+    analytics endpoint but have less item per page than the analytics endpoint.
+
+    This limitation is more than enough for most use cases, given that a user can only have 50 orders
+    per markets.
 
     Args:
         skip (Union[Unset, float]):  Default: 0.0.
@@ -134,7 +140,13 @@ def sync(
     type_: Union[Unset, LimitOrdersControllerGetMakerLimitOrderType] = UNSET,
     is_active: Union[Unset, bool] = UNSET,
 ) -> Optional[LimitOrdersResponse]:
-    """Get limit orders
+    """Get user limit orders in market
+
+     This endpoint let you fetch limit orders of a user in a market, it have more filter options than the
+    analytics endpoint but have less item per page than the analytics endpoint.
+
+    This limitation is more than enough for most use cases, given that a user can only have 50 orders
+    per markets.
 
     Args:
         skip (Union[Unset, float]):  Default: 0.0.
@@ -176,7 +188,13 @@ async def asyncio_detailed(
     type_: Union[Unset, LimitOrdersControllerGetMakerLimitOrderType] = UNSET,
     is_active: Union[Unset, bool] = UNSET,
 ) -> Response[LimitOrdersResponse]:
-    """Get limit orders
+    """Get user limit orders in market
+
+     This endpoint let you fetch limit orders of a user in a market, it have more filter options than the
+    analytics endpoint but have less item per page than the analytics endpoint.
+
+    This limitation is more than enough for most use cases, given that a user can only have 50 orders
+    per markets.
 
     Args:
         skip (Union[Unset, float]):  Default: 0.0.
@@ -221,7 +239,13 @@ async def asyncio(
     type_: Union[Unset, LimitOrdersControllerGetMakerLimitOrderType] = UNSET,
     is_active: Union[Unset, bool] = UNSET,
 ) -> Optional[LimitOrdersResponse]:
-    """Get limit orders
+    """Get user limit orders in market
+
+     This endpoint let you fetch limit orders of a user in a market, it have more filter options than the
+    analytics endpoint but have less item per page than the analytics endpoint.
+
+    This limitation is more than enough for most use cases, given that a user can only have 50 orders
+    per markets.
 
     Args:
         skip (Union[Unset, float]):  Default: 0.0.

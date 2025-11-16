@@ -66,7 +66,15 @@ def sync_detailed(
     client: Union[AuthenticatedClient, Client],
     timestamp: Union[Unset, datetime.datetime] = UNSET,
 ) -> Response[MarketDataResponse]:
-    """Get market latest detailed data by address
+    """Get latest/historical market data by address
+
+     Returns the latest/historical market data for a given market address.
+
+    If timestamp is given, it will return the historical market data at the given timestamp. Otherwise,
+    it will return the latest market data.
+
+    This endpoint have have: market liquidity, trading volume, underlying APY, implied apy, apy
+    breakdown, voter apys, ...
 
     Args:
         chain_id (float):
@@ -101,7 +109,15 @@ def sync(
     client: Union[AuthenticatedClient, Client],
     timestamp: Union[Unset, datetime.datetime] = UNSET,
 ) -> Optional[MarketDataResponse]:
-    """Get market latest detailed data by address
+    """Get latest/historical market data by address
+
+     Returns the latest/historical market data for a given market address.
+
+    If timestamp is given, it will return the historical market data at the given timestamp. Otherwise,
+    it will return the latest market data.
+
+    This endpoint have have: market liquidity, trading volume, underlying APY, implied apy, apy
+    breakdown, voter apys, ...
 
     Args:
         chain_id (float):
@@ -131,7 +147,15 @@ async def asyncio_detailed(
     client: Union[AuthenticatedClient, Client],
     timestamp: Union[Unset, datetime.datetime] = UNSET,
 ) -> Response[MarketDataResponse]:
-    """Get market latest detailed data by address
+    """Get latest/historical market data by address
+
+     Returns the latest/historical market data for a given market address.
+
+    If timestamp is given, it will return the historical market data at the given timestamp. Otherwise,
+    it will return the latest market data.
+
+    This endpoint have have: market liquidity, trading volume, underlying APY, implied apy, apy
+    breakdown, voter apys, ...
 
     Args:
         chain_id (float):
@@ -164,7 +188,15 @@ async def asyncio(
     client: Union[AuthenticatedClient, Client],
     timestamp: Union[Unset, datetime.datetime] = UNSET,
 ) -> Optional[MarketDataResponse]:
-    """Get market latest detailed data by address
+    """Get latest/historical market data by address
+
+     Returns the latest/historical market data for a given market address.
+
+    If timestamp is given, it will return the historical market data at the given timestamp. Otherwise,
+    it will return the latest market data.
+
+    This endpoint have have: market liquidity, trading volume, underlying APY, implied apy, apy
+    breakdown, voter apys, ...
 
     Args:
         chain_id (float):

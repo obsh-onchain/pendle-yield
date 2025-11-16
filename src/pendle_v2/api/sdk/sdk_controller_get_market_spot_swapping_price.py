@@ -52,10 +52,14 @@ def sync_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
 ) -> Response[GetSpotSwappingPriceResponse]:
-    """Get price by swapping underlying token to PT/ YT, also returns implied APY of the market
+    """Get real-time PT/YT swap price of a market
 
-     Try swapping 1 unit of the underlying token to PT/YT, and 1 unit of PT/YT to the underlying token.
+     Return price by swapping  1 unit underlying token to PT/ YT, and 1 unit of PT/YT to the underlying
+    token.
+
     One unit is defined as 10**decimal. The result is updated every block.
+
+    Implied APY of the market is also included.
 
     Args:
         chain_id (float):
@@ -87,10 +91,14 @@ def sync(
     *,
     client: Union[AuthenticatedClient, Client],
 ) -> Optional[GetSpotSwappingPriceResponse]:
-    """Get price by swapping underlying token to PT/ YT, also returns implied APY of the market
+    """Get real-time PT/YT swap price of a market
 
-     Try swapping 1 unit of the underlying token to PT/YT, and 1 unit of PT/YT to the underlying token.
+     Return price by swapping  1 unit underlying token to PT/ YT, and 1 unit of PT/YT to the underlying
+    token.
+
     One unit is defined as 10**decimal. The result is updated every block.
+
+    Implied APY of the market is also included.
 
     Args:
         chain_id (float):
@@ -117,10 +125,14 @@ async def asyncio_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
 ) -> Response[GetSpotSwappingPriceResponse]:
-    """Get price by swapping underlying token to PT/ YT, also returns implied APY of the market
+    """Get real-time PT/YT swap price of a market
 
-     Try swapping 1 unit of the underlying token to PT/YT, and 1 unit of PT/YT to the underlying token.
+     Return price by swapping  1 unit underlying token to PT/ YT, and 1 unit of PT/YT to the underlying
+    token.
+
     One unit is defined as 10**decimal. The result is updated every block.
+
+    Implied APY of the market is also included.
 
     Args:
         chain_id (float):
@@ -150,10 +162,14 @@ async def asyncio(
     *,
     client: Union[AuthenticatedClient, Client],
 ) -> Optional[GetSpotSwappingPriceResponse]:
-    """Get price by swapping underlying token to PT/ YT, also returns implied APY of the market
+    """Get real-time PT/YT swap price of a market
 
-     Try swapping 1 unit of the underlying token to PT/YT, and 1 unit of PT/YT to the underlying token.
+     Return price by swapping  1 unit underlying token to PT/ YT, and 1 unit of PT/YT to the underlying
+    token.
+
     One unit is defined as 10**decimal. The result is updated every block.
+
+    Implied APY of the market is also included.
 
     Args:
         chain_id (float):

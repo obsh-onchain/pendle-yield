@@ -11,7 +11,10 @@ T = TypeVar("T", bound="GetDistinctUsersFromTokenEntity")
 class GetDistinctUsersFromTokenEntity:
     """
     Attributes:
-        users (list[str]):
+        users (list[str]): Array of unique wallet addresses (lowercase) that have interacted with the specified token.
+            Addresses are deduplicated across both Sentio and internal data sources. Example:
+            ['0x1234567890123456789012345678901234567890', '0x0987654321098765432109876543210987654321',
+            '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd'].
     """
 
     users: list[str]

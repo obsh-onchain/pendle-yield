@@ -11,8 +11,8 @@ T = TypeVar("T", bound="VoteV2Response")
 class VoteV2Response:
     """
     Attributes:
-        votes (float):
-        percentage (float):
+        votes (float): Absolute number of votes
+        percentage (float): Percentage of total votes
     """
 
     votes: float

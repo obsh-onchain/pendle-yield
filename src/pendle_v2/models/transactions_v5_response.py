@@ -15,10 +15,10 @@ T = TypeVar("T", bound="TransactionsV5Response")
 class TransactionsV5Response:
     """
     Attributes:
-        total (float):
-        limit (float):
-        skip (float):
-        results (list['TransactionV5Response']):
+        total (float): Total number of transactions available
+        limit (float): Maximum number of results returned
+        skip (float): Number of results skipped for pagination
+        results (list['TransactionV5Response']): List of transactions
     """
 
     total: float

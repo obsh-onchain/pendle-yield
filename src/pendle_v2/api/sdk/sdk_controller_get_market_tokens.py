@@ -52,9 +52,9 @@ def sync_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
 ) -> Response[MarketTokensResponse]:
-    """Get tokens being used in a market
+    """Get supported tokens for market
 
-     Get tokens being used in a market
+     Return tokens to mint or redeem SY and tokens to swap/zap in a market
 
     Args:
         chain_id (float):
@@ -86,9 +86,9 @@ def sync(
     *,
     client: Union[AuthenticatedClient, Client],
 ) -> Optional[MarketTokensResponse]:
-    """Get tokens being used in a market
+    """Get supported tokens for market
 
-     Get tokens being used in a market
+     Return tokens to mint or redeem SY and tokens to swap/zap in a market
 
     Args:
         chain_id (float):
@@ -115,9 +115,9 @@ async def asyncio_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
 ) -> Response[MarketTokensResponse]:
-    """Get tokens being used in a market
+    """Get supported tokens for market
 
-     Get tokens being used in a market
+     Return tokens to mint or redeem SY and tokens to swap/zap in a market
 
     Args:
         chain_id (float):
@@ -147,9 +147,9 @@ async def asyncio(
     *,
     client: Union[AuthenticatedClient, Client],
 ) -> Optional[MarketTokensResponse]:
-    """Get tokens being used in a market
+    """Get supported tokens for market
 
-     Get tokens being used in a market
+     Return tokens to mint or redeem SY and tokens to swap/zap in a market
 
     Args:
         chain_id (float):

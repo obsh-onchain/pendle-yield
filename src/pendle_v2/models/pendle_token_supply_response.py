@@ -13,10 +13,10 @@ T = TypeVar("T", bound="PendleTokenSupplyResponse")
 class PendleTokenSupplyResponse:
     """
     Attributes:
-        timestamp (datetime.datetime):
-        total_pendle_circulating (float):
-        total_pendle_locked (float):
-        total_pendle_supply (float):
+        timestamp (datetime.datetime): Timestamp of the token supply data
+        total_pendle_circulating (float): Total circulating supply of PENDLE tokens (not locked)
+        total_pendle_locked (float): Total amount of PENDLE tokens locked in vePENDLE
+        total_pendle_supply (float): Total supply of PENDLE tokens
     """
 
     timestamp: datetime.datetime
