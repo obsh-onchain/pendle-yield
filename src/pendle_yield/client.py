@@ -5,9 +5,10 @@ This module contains the PendleYieldClient class, which provides the primary
 interface for interacting with Pendle Finance data.
 """
 
+import logging
 import sqlite3
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from datetime import datetime as dt
 from pathlib import Path
 from typing import Any
@@ -15,9 +16,16 @@ from typing import Any
 import httpx
 
 from pendle_v2 import Client as PendleV2Client
+from pendle_v2.api.markets import markets_controller_market_historical_data_v_2
 from pendle_v2.api.ve_pendle import (
     ve_pendle_controller_all_market_total_fees,
     ve_pendle_controller_get_pool_voter_apr_and_swap_fee,
+)
+from pendle_v2.models.market_historical_data_response import (
+    MarketHistoricalDataResponse,
+)
+from pendle_v2.models.markets_controller_market_historical_data_v2_time_frame import (
+    MarketsControllerMarketHistoricalDataV2TimeFrame,
 )
 from pendle_v2.types import UNSET
 
@@ -198,6 +206,78 @@ class PendleYieldClient:
                 """
                 CREATE INDEX IF NOT EXISTS idx_snapshot_epoch
                 ON epoch_votes_snapshots(epoch_start, epoch_end)
+                """
+            )
+
+            # Create market_historical_data table for caching daily historical data
+            # Using flat structure with individual columns for efficient SQL queries
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS market_historical_data (
+                    chain_id INTEGER NOT NULL,
+                    market_address TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    timestamp TEXT,  -- Nullable to support marker rows for empty results
+                    -- APY metrics (all REAL for float values, nullable)
+                    max_apy REAL,
+                    base_apy REAL,
+                    underlying_apy REAL,
+                    implied_apy REAL,
+                    underlying_interest_apy REAL,
+                    underlying_reward_apy REAL,
+                    yt_floating_apy REAL,
+                    swap_fee_apy REAL,
+                    voter_apr REAL,
+                    pendle_apy REAL,
+                    lp_reward_apy REAL,
+                    -- TVL and volume metrics
+                    tvl REAL,
+                    total_tvl REAL,
+                    trading_volume REAL,
+                    -- Price metrics
+                    pt_price REAL,
+                    yt_price REAL,
+                    sy_price REAL,
+                    lp_price REAL,
+                    -- Supply metrics
+                    total_pt REAL,
+                    total_sy REAL,
+                    total_supply REAL,
+                    -- Fee breakdown (daily/weekly only)
+                    explicit_swap_fee REAL,
+                    implicit_swap_fee REAL,
+                    limit_order_fee REAL,
+                    -- Other metrics
+                    last_epoch_votes REAL,
+                    -- Metadata
+                    created_at INTEGER NOT NULL,
+                    PRIMARY KEY (chain_id, market_address, date)
+                )
+                """
+            )
+
+            # Create index for efficient market lookups
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_market_historical_market
+                ON market_historical_data(chain_id, market_address)
+                """
+            )
+
+            # Migrate existing table if needed: make timestamp column nullable
+            # Check if the table exists and has the old schema
+            cursor.execute(
+                """
+                SELECT sql FROM sqlite_master
+                WHERE type='table' AND name='market_historical_data'
+                """
+            )
+
+            # Create index for efficient date range queries
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_market_historical_date
+                ON market_historical_data(date)
                 """
             )
 
@@ -1040,3 +1120,535 @@ class PendleYieldClient:
             self._store_votes_snapshot(epoch, snapshot)
 
         return snapshot
+
+    def get_market_historical_data_cached(
+        self,
+        chain_id: int,
+        market_address: str,
+        start_date: date,
+        end_date: date,
+        force_refresh: bool = False,
+    ) -> MarketHistoricalDataResponse:
+        """
+        Get market historical data with caching support.
+
+        This method fetches daily historical data from the Pendle v2 API with intelligent
+        caching behavior:
+        - Past dates (before today UTC): Served from cache if available, never refetched
+        - Current date (today UTC): Always fetched fresh from API and cache updated
+        - Future dates: Not supported
+
+        The method uses daily resolution and includes all available fields with fee breakdown.
+
+        Args:
+            chain_id: Chain ID (e.g., 1 for Ethereum mainnet)
+            market_address: Market address (case-insensitive)
+            start_date: Start date for the data range (inclusive)
+            end_date: End date for the data range (inclusive)
+            force_refresh: If True, bypass cache and fetch fresh data for all dates
+                          (useful for testing/debugging)
+
+        Returns:
+            MarketHistoricalDataResponse containing daily data points
+
+        Raises:
+            ValidationError: If date range is invalid
+            APIError: If the API request fails
+
+        Example:
+            >>> from datetime import date
+            >>> client = PendleYieldClient(etherscan_api_key="...", db_path="cache.db")
+            >>> response = client.get_market_historical_data_cached(
+            ...     chain_id=1,
+            ...     market_address="0xb4460e76d99ecad95030204d3c25fb33c4833997",
+            ...     start_date=date(2024, 1, 1),
+            ...     end_date=date(2024, 1, 31)
+            ... )
+            >>> print(f"Retrieved {len(response.results)} data points")
+        """
+        # Normalize market address to lowercase
+        market_address = market_address.lower()
+
+        # Validate date range
+        if start_date > end_date:
+            raise ValidationError(
+                "Start date must be before or equal to end date",
+                field="date_range",
+                value=f"{start_date} to {end_date}",
+            )
+
+        # Get current date in UTC for cache invalidation logic
+        today_utc = datetime.now(UTC).date()
+
+        # Logging for debugging
+        import logging
+        logger = logging.getLogger("pendle_yield.cache")
+        logger.info(
+            f"get_market_historical_data_cached: chain_id={chain_id}, "
+            f"market={market_address[:10]}..., dates={start_date} to {end_date}, "
+            f"today_utc={today_utc}, caching_enabled={self._caching_enabled}, "
+            f"force_refresh={force_refresh}"
+        )
+
+        # Collect all data points (will be populated from cache and/or API)
+        all_data_points: dict[str, dict[str, Any]] = {}
+
+        # Determine which dates need to be fetched from API
+        dates_to_fetch: list[date] = []
+        current_date = start_date
+
+        while current_date <= end_date:
+            # Skip future dates
+            if current_date > today_utc:
+                logger.debug(f"  {current_date}: SKIP (future date)")
+                current_date += timedelta(days=1)
+                continue
+
+            # Check if we should use cache for this date
+            use_cache = (
+                self._caching_enabled
+                and not force_refresh
+                and current_date < today_utc  # Only cache past dates
+            )
+
+            if use_cache:
+                # Try to get from cache
+                cached_data = self._get_cached_historical_data(
+                    chain_id, market_address, current_date
+                )
+                if cached_data is not None:
+                    # Cache hit - use cached data (may be empty dict for marker rows)
+                    if cached_data:
+                        logger.info(f"  {current_date}: CACHE HIT (has data)")
+                    else:
+                        logger.info(f"  {current_date}: CACHE HIT (empty result marker)")
+                    all_data_points[current_date.isoformat()] = cached_data
+                    current_date += timedelta(days=1)
+                    continue
+                # Cache miss - will need to fetch from API
+                logger.info(f"  {current_date}: CACHE MISS (will fetch from API)")
+            else:
+                # Not using cache for this date (force_refresh=True or current_date >= today)
+                reason = "force_refresh" if force_refresh else "current/future date"
+                logger.info(f"  {current_date}: NO CACHE ({reason}, will fetch from API)")
+
+            # Cache miss or current date - need to fetch from API
+            dates_to_fetch.append(current_date)
+            current_date += timedelta(days=1)
+
+        # Fetch missing dates from API if needed
+        if dates_to_fetch:
+            logger.info(f"Need to fetch {len(dates_to_fetch)} dates from API")
+
+            # Group consecutive dates into ranges to minimize API calls
+            date_ranges: list[tuple[date, date]] = []
+            range_start = dates_to_fetch[0]
+            range_end = dates_to_fetch[0]
+
+            for i in range(1, len(dates_to_fetch)):
+                if dates_to_fetch[i] == range_end + timedelta(days=1):
+                    # Extend current range
+                    range_end = dates_to_fetch[i]
+                else:
+                    # Start new range
+                    date_ranges.append((range_start, range_end))
+                    range_start = dates_to_fetch[i]
+                    range_end = dates_to_fetch[i]
+
+            # Add the last range
+            date_ranges.append((range_start, range_end))
+
+            logger.info(f"Grouped into {len(date_ranges)} API call(s)")
+
+            # Fetch each range from API
+            for fetch_start, fetch_end in date_ranges:
+                logger.info(f"Calling API for date range: {fetch_start} to {fetch_end}")
+                api_response = self._fetch_market_historical_data_from_api(
+                    chain_id, market_address, fetch_start, fetch_end
+                )
+                logger.info(f"API returned {len(api_response.results)} data points")
+
+                # Track which dates in this range were returned by the API
+                returned_dates: set[date] = set()
+
+                # Process and cache the results
+                for data_point in api_response.results:
+                    # Extract date from timestamp
+                    point_date = data_point.timestamp.date()
+                    returned_dates.add(point_date)
+
+                    # Convert data point to dictionary for storage
+                    point_dict = data_point.to_dict()
+
+                    # Store in our collection
+                    all_data_points[point_date.isoformat()] = point_dict
+
+                    # Cache past dates (not today)
+                    if self._caching_enabled and point_date < today_utc:
+                        logger.info(f"  Caching data for {point_date}")
+                        self._store_historical_data(
+                            chain_id, market_address, point_date, point_dict
+                        )
+                    elif self._caching_enabled:
+                        logger.info(f"  NOT caching {point_date} (today or future)")
+
+                # Cache marker rows for dates that were requested but not returned
+                # This prevents re-fetching empty results on subsequent runs
+                if self._caching_enabled:
+                    current = fetch_start
+                    while current <= fetch_end:
+                        if current < today_utc and current not in returned_dates:
+                            logger.info(
+                                f"  Caching EMPTY result marker for {current} "
+                                "(API returned no data for this date)"
+                            )
+                            self._store_historical_data(
+                                chain_id, market_address, current, None
+                            )
+                        current += timedelta(days=1)
+        else:
+            logger.info("All dates found in cache, no API calls needed")
+
+        # Build response from collected data points
+        # Filter out empty dicts (marker rows for dates with no data)
+        # and sort by date to ensure chronological order
+        non_empty_data_points = {
+            date_str: data
+            for date_str, data in all_data_points.items()
+            if data  # Filters out empty dicts {}
+        }
+        sorted_dates = sorted(non_empty_data_points.keys())
+
+        if not sorted_dates:
+            # No data available (all dates were marker rows or no dates requested)
+            return MarketHistoricalDataResponse(
+                total=0,
+                timestamp_start=datetime.combine(start_date, datetime.min.time()).replace(
+                    tzinfo=UTC
+                ),
+                timestamp_end=datetime.combine(end_date, datetime.min.time()).replace(
+                    tzinfo=UTC
+                ),
+                results=[],
+            )
+
+        # Convert dictionaries back to MarketHistoricalDataPoint objects
+        from pendle_v2.models.market_historical_data_point import (
+            MarketHistoricalDataPoint,
+        )
+
+        results = [
+            MarketHistoricalDataPoint.from_dict(non_empty_data_points[date_str])
+            for date_str in sorted_dates
+        ]
+
+        # Create response
+        return MarketHistoricalDataResponse(
+            total=len(results),
+            timestamp_start=results[0].timestamp,
+            timestamp_end=results[-1].timestamp,
+            results=results,
+        )
+
+    def _fetch_market_historical_data_from_api(
+        self, chain_id: int, market_address: str, start_date: date, end_date: date
+    ) -> MarketHistoricalDataResponse:
+        """
+        Fetch market historical data from the Pendle v2 API.
+
+        This is a low-level method that directly calls the API without caching.
+        Use get_market_historical_data_cached() for the caching version.
+
+        Args:
+            chain_id: Chain ID (e.g., 1 for Ethereum mainnet)
+            market_address: Market address (lowercase)
+            start_date: Start date for the data range
+            end_date: End date for the data range
+
+        Returns:
+            MarketHistoricalDataResponse from the API
+
+        Raises:
+            APIError: If the API request fails
+        """
+        # Note: This endpoint costs approximately 5 CU per request
+        # (actual cost may vary based on date range and fields requested)
+        self._enforce_pendle_rate_limit(cu_cost=5.0)
+
+        # Convert dates to datetime objects for the API
+        timestamp_start = datetime.combine(start_date, datetime.min.time()).replace(
+            tzinfo=UTC
+        )
+        timestamp_end = datetime.combine(
+            end_date, datetime.max.time()
+        ).replace(tzinfo=UTC)
+
+        try:
+            # Request all available fields with fee breakdown
+            fields = (
+                "timestamp,maxApy,baseApy,underlyingApy,impliedApy,tvl,totalTvl,"
+                "underlyingInterestApy,underlyingRewardApy,ytFloatingApy,swapFeeApy,"
+                "voterApr,pendleApy,lpRewardApy,totalPt,totalSy,totalSupply,ptPrice,"
+                "ytPrice,syPrice,lpPrice,lastEpochVotes,tradingVolume"
+            )
+
+            response = markets_controller_market_historical_data_v_2.sync(
+                chain_id=float(chain_id),
+                address=market_address,
+                client=self._pendle_v2_client,
+                time_frame=MarketsControllerMarketHistoricalDataV2TimeFrame.DAY,
+                timestamp_start=timestamp_start,
+                timestamp_end=timestamp_end,
+                fields=fields,
+                include_fee_breakdown=True,
+            )
+
+            if response is None:
+                raise APIError(
+                    f"Failed to fetch historical data for market {market_address}"
+                )
+
+            # Handle empty results - API may return response without timestamp_start/end
+            # when there are no data points
+            if response.total == 0 or not response.results:
+                # Return empty response with our requested date range
+                return MarketHistoricalDataResponse(
+                    total=0,
+                    timestamp_start=timestamp_start,
+                    timestamp_end=timestamp_end,
+                    results=[],
+                )
+
+            return response
+        except KeyError as e:
+            # Handle empty API responses that are missing timestamp_start/timestamp_end
+            # This happens when the API returns {"total": 0, "results": []}
+            if "timestamp_start" in str(e) or "timestamp_end" in str(e):
+                logger = logging.getLogger("pendle_yield.cache")
+                logger.debug(
+                    f"API returned empty result (missing {e}), "
+                    f"returning empty response for {start_date} to {end_date}"
+                )
+                return MarketHistoricalDataResponse(
+                    total=0,
+                    timestamp_start=timestamp_start,
+                    timestamp_end=timestamp_end,
+                    results=[],
+                )
+            # Re-raise if it's a different KeyError
+            raise APIError(
+                f"Failed to fetch market historical data from API: {str(e)}"
+            ) from e
+        except Exception as e:
+            raise APIError(
+                f"Failed to fetch market historical data from API: {str(e)}"
+            ) from e
+
+    def _get_cached_historical_data(
+        self, chain_id: int, market_address: str, target_date: date
+    ) -> dict[str, Any] | None:
+        """
+        Retrieve cached historical data for a specific market and date.
+
+        Args:
+            chain_id: Chain ID (e.g., 1 for Ethereum mainnet)
+            market_address: Market address (lowercase)
+            target_date: Date to retrieve data for
+
+        Returns:
+            Dictionary containing the cached data, or None if not cached.
+            Returns an empty dict {} for marker rows (dates that were fetched but had no data).
+        """
+        if not self._caching_enabled:
+            return None
+
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            cursor = conn.cursor()
+
+            # Query for the specific date - select all data columns
+            date_str = target_date.isoformat()
+            cursor.execute(
+                """
+                SELECT
+                    timestamp,
+                    max_apy, base_apy, underlying_apy, implied_apy,
+                    underlying_interest_apy, underlying_reward_apy, yt_floating_apy,
+                    swap_fee_apy, voter_apr, pendle_apy, lp_reward_apy,
+                    tvl, total_tvl, trading_volume,
+                    pt_price, yt_price, sy_price, lp_price,
+                    total_pt, total_sy, total_supply,
+                    explicit_swap_fee, implicit_swap_fee, limit_order_fee,
+                    last_epoch_votes
+                FROM market_historical_data
+                WHERE chain_id = ? AND market_address = ? AND date = ?
+                """,
+                (chain_id, market_address.lower(), date_str),
+            )
+
+            row = cursor.fetchone()
+            if row is None:
+                # No row found - this date was never fetched
+                return None
+
+            # Check if this is a marker row (all data fields are NULL)
+            # Marker rows indicate the date was fetched but had no data
+            timestamp = row[0]
+
+            # Reconstruct the data dictionary from individual columns
+            # Use the same camelCase keys as the API response
+            data: dict[str, Any] = {}
+
+            # Add timestamp if present
+            if timestamp is not None:
+                data["timestamp"] = timestamp
+
+            # Map column indices to field names (camelCase for API compatibility)
+            field_mapping = [
+                (1, "maxApy"),
+                (2, "baseApy"),
+                (3, "underlyingApy"),
+                (4, "impliedApy"),
+                (5, "underlyingInterestApy"),
+                (6, "underlyingRewardApy"),
+                (7, "ytFloatingApy"),
+                (8, "swapFeeApy"),
+                (9, "voterApr"),
+                (10, "pendleApy"),
+                (11, "lpRewardApy"),
+                (12, "tvl"),
+                (13, "totalTvl"),
+                (14, "tradingVolume"),
+                (15, "ptPrice"),
+                (16, "ytPrice"),
+                (17, "syPrice"),
+                (18, "lpPrice"),
+                (19, "totalPt"),
+                (20, "totalSy"),
+                (21, "totalSupply"),
+                (22, "explicitSwapFee"),
+                (23, "implicitSwapFee"),
+                (24, "limitOrderFee"),
+                (25, "lastEpochVotes"),
+            ]
+
+            # Only include fields that are not None (matching API behavior)
+            for idx, field_name in field_mapping:
+                if row[idx] is not None:
+                    data[field_name] = row[idx]
+
+            # Return the data dict (may be empty {} for marker rows)
+            return data
+        finally:
+            conn.close()
+
+    def _store_historical_data(
+        self,
+        chain_id: int,
+        market_address: str,
+        target_date: date,
+        data: dict[str, Any] | None,
+    ) -> None:
+        """
+        Store historical data for a specific market and date in the cache.
+
+        Args:
+            chain_id: Chain ID (e.g., 1 for Ethereum mainnet)
+            market_address: Market address (lowercase)
+            target_date: Date of the data
+            data: Dictionary containing the historical data to store, or None to store
+                  a marker row indicating this date was fetched but had no data
+        """
+        if not self._caching_enabled:
+            return
+
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            cursor = conn.cursor()
+
+            # Get current timestamp for cache metadata
+            created_at = int(datetime.now(UTC).timestamp())
+            date_str = target_date.isoformat()
+
+            # Extract individual fields from data dictionary
+            # Use .get() with None default for optional fields
+            # If data is None (marker row for empty results), all fields will be None
+            timestamp = data.get("timestamp") if data else None
+            max_apy = data.get("maxApy") if data else None
+            base_apy = data.get("baseApy") if data else None
+            underlying_apy = data.get("underlyingApy") if data else None
+            implied_apy = data.get("impliedApy") if data else None
+            underlying_interest_apy = data.get("underlyingInterestApy") if data else None
+            underlying_reward_apy = data.get("underlyingRewardApy") if data else None
+            yt_floating_apy = data.get("ytFloatingApy") if data else None
+            swap_fee_apy = data.get("swapFeeApy") if data else None
+            voter_apr = data.get("voterApr") if data else None
+            pendle_apy = data.get("pendleApy") if data else None
+            lp_reward_apy = data.get("lpRewardApy") if data else None
+            tvl = data.get("tvl") if data else None
+            total_tvl = data.get("totalTvl") if data else None
+            trading_volume = data.get("tradingVolume") if data else None
+            pt_price = data.get("ptPrice") if data else None
+            yt_price = data.get("ytPrice") if data else None
+            sy_price = data.get("syPrice") if data else None
+            lp_price = data.get("lpPrice") if data else None
+            total_pt = data.get("totalPt") if data else None
+            total_sy = data.get("totalSy") if data else None
+            total_supply = data.get("totalSupply") if data else None
+            explicit_swap_fee = data.get("explicitSwapFee") if data else None
+            implicit_swap_fee = data.get("implicitSwapFee") if data else None
+            limit_order_fee = data.get("limitOrderFee") if data else None
+            last_epoch_votes = data.get("lastEpochVotes") if data else None
+
+            # Use INSERT OR REPLACE to handle duplicates
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO market_historical_data (
+                    chain_id, market_address, date, timestamp,
+                    max_apy, base_apy, underlying_apy, implied_apy,
+                    underlying_interest_apy, underlying_reward_apy, yt_floating_apy,
+                    swap_fee_apy, voter_apr, pendle_apy, lp_reward_apy,
+                    tvl, total_tvl, trading_volume,
+                    pt_price, yt_price, sy_price, lp_price,
+                    total_pt, total_sy, total_supply,
+                    explicit_swap_fee, implicit_swap_fee, limit_order_fee,
+                    last_epoch_votes, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    chain_id,
+                    market_address.lower(),
+                    date_str,
+                    timestamp,
+                    max_apy,
+                    base_apy,
+                    underlying_apy,
+                    implied_apy,
+                    underlying_interest_apy,
+                    underlying_reward_apy,
+                    yt_floating_apy,
+                    swap_fee_apy,
+                    voter_apr,
+                    pendle_apy,
+                    lp_reward_apy,
+                    tvl,
+                    total_tvl,
+                    trading_volume,
+                    pt_price,
+                    yt_price,
+                    sy_price,
+                    lp_price,
+                    total_pt,
+                    total_sy,
+                    total_supply,
+                    explicit_swap_fee,
+                    implicit_swap_fee,
+                    limit_order_fee,
+                    last_epoch_votes,
+                    created_at,
+                ),
+            )
+
+            conn.commit()
+        finally:
+            conn.close()
